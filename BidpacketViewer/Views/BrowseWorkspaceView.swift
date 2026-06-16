@@ -12,6 +12,7 @@ struct BrowseWorkspaceView: View {
     @State private var selectedDayFilter: DayLengthFilter = .all
     @State private var selectedSort: RotationSortOption = .rotationNumber
     @State private var sortAscending = true
+    @State private var isHeaderCollapsed = false
 
     private let topAnchorID = "top"
 
@@ -96,12 +97,13 @@ struct BrowseWorkspaceView: View {
 
     private var frozenTopSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(viewModel.primaryBase) \(viewModel.bidpacket?.aircraft ?? "Unknown Aircraft")")
-                        .font(.system(size: 34, weight: .bold))
+                        .font(.system(size: isHeaderCollapsed ? 22 : 34, weight: .bold))
 
-                    if let month = viewModel.bidpacket?.bidpacketMonth,
+                    if !isHeaderCollapsed,
+                       let month = viewModel.bidpacket?.bidpacketMonth,
                        let year = viewModel.bidpacket?.bidpacketYear {
                         Text(monthName(month) + " " + String(year))
                             .font(.title3)
@@ -111,26 +113,41 @@ struct BrowseWorkspaceView: View {
 
                 Spacer()
 
-                metricBlock(title: "Rotations", value: "\(viewModel.rotationCount)")
-                metricBlock(title: "Instances", value: "\(viewModel.instanceCount)")
-                metricBlock(title: "Selected", value: "\(viewModel.selectedCount)")
-            }
-
-            HStack(spacing: 14) {
-                searchSection
-
-                Picker("View Mode", selection: $showingSelectedOnly) {
-                    Text("All").tag(false)
-                    Text("Selected").tag(true)
+                if !isHeaderCollapsed {
+                    metricBlock(title: "Rotations", value: "\(viewModel.rotationCount)")
+                    metricBlock(title: "Instances", value: "\(viewModel.instanceCount)")
+                    metricBlock(title: "Selected", value: "\(viewModel.selectedCount)")
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 260)
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isHeaderCollapsed.toggle()
+                    }
+                } label: {
+                    Image(systemName: isHeaderCollapsed ? "chevron.down.circle.fill" : "chevron.up.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
             }
 
-            dayFilterChips
+            if !isHeaderCollapsed {
+                HStack(spacing: 14) {
+                    searchSection
+
+                    Picker("View Mode", selection: $showingSelectedOnly) {
+                        Text("All").tag(false)
+                        Text("Selected").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 260)
+                }
+
+                dayFilterChips
+            }
         }
         .padding(.horizontal, 28)
-        .padding(.vertical, 18)
+        .padding(.vertical, isHeaderCollapsed ? 10 : 18)
         .background(.regularMaterial)
         .overlay(
             Rectangle()
@@ -139,7 +156,7 @@ struct BrowseWorkspaceView: View {
             alignment: .bottom
         )
     }
-
+    
     private var searchSection: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")

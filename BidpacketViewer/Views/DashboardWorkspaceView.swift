@@ -1,9 +1,3 @@
-//
-//  DashboardWorkspaceView.swift
-//  BidpacketViewer
-//
-//  Created by Robert Steward on 6/15/26.
-//
 
 import SwiftUI
 
@@ -12,34 +6,59 @@ struct DashboardWorkspaceView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("\(viewModel.primaryBase) \(viewModel.bidpacket?.aircraft ?? "Unknown Aircraft")")
-                    .font(.largeTitle.bold())
+            VStack(alignment: .leading, spacing: 24) {
+                headerSection
+                compactSummarySection
+                selectedPlanSection
 
-                Text("Dashboard")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
+                HStack(alignment: .top, spacing: 18) {
+                    dashboardGroup(title: "Rotation Mix") {
+                        VStack(spacing: 16) {
+                            ForEach(viewModel.rotationsByLength, id: \.label) { item in
+                                largeBarRow(
+                                    label: item.label,
+                                    primaryValue: "\(item.instances)",
+                                    secondaryValue: "\(item.rotations) rot.",
+                                    count: item.instances,
+                                    total: max(viewModel.instanceCount, 1)
+                                )
+                            }
+                        }
+                    }
 
-                HStack(spacing: 14) {
-                    dashboardCard(title: "Rotations", value: "\(viewModel.rotationCount)")
-                    dashboardCard(title: "Instances", value: "\(viewModel.instanceCount)")
-                    dashboardCard(title: "Selected", value: "\(viewModel.selectedCount)")
-                }
-
-                dashboardGroup(title: "By Length") {
-                    VStack(spacing: 10) {
-                        lengthRow("1 Day", count: countByDays(1))
-                        lengthRow("2 Day", count: countByDays(2))
-                        lengthRow("3 Day", count: countByDays(3))
-                        lengthRow("4 Day", count: countByDays(4))
-                        lengthRow("5+ Day", count: countFivePlus())
+                    dashboardGroup(title: "Operational") {
+                        VStack(spacing: 16) {
+                            iconStatRow("🌙", "Red-eyes", "\(viewModel.totalRedeyes)")
+                            iconStatRow("🏨", "Day Layovers", "\(viewModel.totalDayLayovers)")
+                            iconStatRow("🚕", "Cross-town", "\(viewModel.totalCrossTownLayovers)")
+                            iconStatRow("🚌", "Front DH", "\(viewModel.frontDeadheadCount)")
+                            iconStatRow("🚌", "Back DH", "\(viewModel.backDeadheadCount)")
+                            iconStatRow("🦵", "Max Legs", "\(viewModel.maxLegsInAnyDutyPeriod)")
+                            iconStatRow("⏱️", "Longest FDP", viewModel.formatMinutesAsHM(viewModel.longestFDPMinutes))
+                        }
                     }
                 }
 
-                dashboardGroup(title: "Top Overnights") {
-                    VStack(spacing: 10) {
-                        ForEach(topOvernights, id: \.station) { item in
-                            lengthRow(item.station, count: item.count)
+                HStack(alignment: .top, spacing: 18) {
+                    dashboardGroup(title: "Commutability") {
+                        VStack(spacing: 16) {
+                            coloredBarRow("🟢", "Fully", count: viewModel.fullyCommutableCount)
+                            coloredBarRow("🟡", "Front-only", count: viewModel.frontOnlyCommutableCount)
+                            coloredBarRow("🔵", "Back-only", count: viewModel.backOnlyCommutableCount)
+                        }
+                    }
+
+                    dashboardGroup(title: "Top Overnights") {
+                        VStack(spacing: 16) {
+                            ForEach(viewModel.topOvernights.prefix(8), id: \.station) { item in
+                                largeBarRow(
+                                    label: item.station,
+                                    primaryValue: "\(item.count)",
+                                    secondaryValue: percentText(Double(item.count) / Double(max(viewModel.instanceCount, 1))),
+                                    count: item.count,
+                                    total: max(viewModel.instanceCount, 1)
+                                )
+                            }
                         }
                     }
                 }
@@ -50,80 +69,185 @@ struct DashboardWorkspaceView: View {
         .navigationTitle("Dashboard")
     }
 
-    private func dashboardCard(title: String, value: String) -> some View {
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(viewModel.primaryBase) \(viewModel.bidpacket?.aircraft ?? "Unknown Aircraft")")
+                .font(.system(size: 48, weight: .bold))
+
+            if let month = viewModel.bidpacket?.bidpacketMonth,
+               let year = viewModel.bidpacket?.bidpacketYear {
+                Text("\(monthName(month)) \(year)")
+                    .font(.title)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("\(viewModel.rotationCount) rotations • \(viewModel.instanceCount) instances")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var compactSummarySection: some View {
+        HStack(spacing: 14) {
+            compactMetric("Credit", viewModel.formatMinutesAsCredit(viewModel.totalCreditMinutes))
+            compactMetric("Avg Credit", viewModel.formatMinutesAsCredit(viewModel.averageCreditPerInstanceMinutes))
+            compactMetric("Selected", "\(viewModel.selectedCount)")
+            compactMetric("Selected Credit", viewModel.formatMinutesAsCredit(viewModel.selectedCreditMinutes))
+        }
+    }
+
+    private var selectedPlanSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Current Plan")
+                    .font(.title2.bold())
+
+                Spacer()
+
+                Text("⭐")
+                    .font(.title2)
+            }
+
+            HStack(spacing: 28) {
+                planMetric("Rotations", "\(viewModel.selectedCount)")
+                planMetric("Instances", "\(viewModel.selectedInstanceCount)")
+                planMetric("Credit", viewModel.formatMinutesAsCredit(viewModel.selectedCreditMinutes))
+                planMetric("Avg", viewModel.formatMinutesAsCredit(viewModel.selectedAverageCreditPerInstanceMinutes))
+            }
+        }
+        .padding(22)
+        .background(.background)
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+    }
+
+    private func compactMetric(_ title: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             Text(value)
-                .font(.system(size: 34, weight: .bold))
+                .font(.system(size: 28, weight: .bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
+        .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
+        .padding(18)
         .background(.background)
         .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func planMetric(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value)
+                .font(.title.bold())
+
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func dashboardGroup<Content: View>(
         title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 18) {
             Text(title)
-                .font(.headline)
+                .font(.title2.bold())
 
             content()
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(.background)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .clipShape(RoundedRectangle(cornerRadius: 22))
     }
 
-    private func lengthRow(_ label: String, count: Int) -> some View {
-        HStack {
+    private func largeBarRow(
+        label: String,
+        primaryValue: String,
+        secondaryValue: String,
+        count: Int,
+        total: Int
+    ) -> some View {
+        let percent = Double(count) / Double(max(total, 1))
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(label)
+                    .font(.headline)
+
+                Spacer()
+
+                Text(primaryValue)
+                    .font(.headline)
+
+                Text(secondaryValue)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            ProgressView(value: percent)
+                .scaleEffect(x: 1, y: 1.7, anchor: .center)
+
+            Text("\(percentText(percent)) of instances")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func coloredBarRow(_ icon: String, _ label: String, count: Int) -> some View {
+        let total = max(viewModel.instanceCount, 1)
+        let percent = Double(count) / Double(total)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(icon)
+
+                Text(label)
+                    .font(.headline)
+
+                Spacer()
+
+                Text("\(count)")
+                    .font(.headline)
+
+                Text(percentText(percent))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            ProgressView(value: percent)
+                .scaleEffect(x: 1, y: 1.7, anchor: .center)
+        }
+    }
+
+    private func iconStatRow(_ icon: String, _ label: String, _ value: String) -> some View {
+        HStack(spacing: 12) {
+            Text(icon)
+                .frame(width: 28)
+
             Text(label)
                 .font(.headline)
 
             Spacer()
 
-            Text("\(count)")
+            Text(value)
                 .font(.headline)
                 .foregroundStyle(.secondary)
         }
     }
 
-    private func countByDays(_ days: Int) -> Int {
-        viewModel.rotations.filter { $0.numDays == days }.count
+    private func percentText(_ value: Double) -> String {
+        "\(Int((value * 100).rounded()))%"
     }
 
-    private func countFivePlus() -> Int {
-        viewModel.rotations.filter { ($0.numDays ?? 0) >= 5 }.count
-    }
-
-    private var topOvernights: [(station: String, count: Int)] {
-        var counts: [String: Int] = [:]
-
-        for rotation in viewModel.rotations {
-            guard let overnights = rotation.overnights else { continue }
-
-            for part in overnights.split(separator: ",") {
-                let station = part
-                    .split(separator: ":")
-                    .first?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-
-                if let station, !station.isEmpty {
-                    counts[station, default: 0] += 1
-                }
-            }
-        }
-
-        return counts
-            .map { (station: $0.key, count: $0.value) }
-            .sorted { $0.count > $1.count }
-            .prefix(8)
-            .map { $0 }
+    private func monthName(_ month: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM"
+        let date = Calendar.current.date(from: DateComponents(year: 2026, month: month, day: 1))
+        return date.map { formatter.string(from: $0) } ?? "\(month)"
     }
 }

@@ -50,19 +50,19 @@ struct RotationCardView: View {
                     .font(.headline)
                     .foregroundStyle(.secondary)
 
-                Text("•")
-                    .foregroundStyle(.tertiary)
+                separatorDot
 
                 Text("\(rotation.totalCredit?.hm ?? "—") Credit")
                     .font(.headline)
                     .foregroundStyle(.secondary)
 
-                Text("•")
-                    .foregroundStyle(.tertiary)
+                separatorDot
 
                 Text(startDateSummary)
                     .font(.headline)
                     .foregroundStyle(.secondary)
+
+                infoBadgeLine
 
                 Spacer()
 
@@ -81,10 +81,15 @@ struct RotationCardView: View {
         }
         .contentShape(Rectangle())
     }
+
     private var expandedContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             if let overnightSummary {
                 infoPill(title: "Overnights", value: overnightSummary)
+            }
+
+            if !infoBadges.isEmpty {
+                infoPill(title: "Flags", value: infoBadges.joined(separator: "  "))
             }
 
             infoPill(title: "Start Dates", value: fullDateList)
@@ -106,6 +111,29 @@ struct RotationCardView: View {
         }
     }
 
+    private var infoBadgeLine: some View {
+        HStack(spacing: 6) {
+            ForEach(infoBadges.prefix(4), id: \.self) { badge in
+                Text(badge)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            if infoBadges.count > 4 {
+                Text("+\(infoBadges.count - 4)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)
+    }
+
+    private var separatorDot: some View {
+        Text("•")
+            .foregroundStyle(.tertiary)
+    }
+
     private func infoPill(title: String, value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
@@ -120,6 +148,48 @@ struct RotationCardView: View {
         .padding(.vertical, 8)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var infoBadges: [String] {
+        var badges: [String] = []
+
+        if (rotation.numRedeyes ?? 0) > 0 {
+            badges.append("🌙 Red-eye")
+        }
+
+        if (rotation.dayLayovers ?? 0) > 0 {
+            badges.append("🏨 Day Layover")
+        }
+
+        if (rotation.xtownLayover ?? 0) > 0 {
+            badges.append("🚕 Cross-town")
+        }
+
+        if rotation.frontDH == true && rotation.backDH == true {
+            badges.append("🚌 Front/Back DH")
+        } else if rotation.frontDH == true {
+            badges.append("🚌 Front DH")
+        } else if rotation.backDH == true {
+            badges.append("🚌 Back DH")
+        }
+
+        if rotation.fullyCommutable == true {
+            badges.append("✅ Full")
+        } else if rotation.frontCommutable == true {
+            badges.append("⬆️ Front")
+        } else if rotation.backCommutable == true {
+            badges.append("⬇️ Back")
+        }
+
+        if let maxLegs = rotation.maxLegs, maxLegs >= 4 {
+            badges.append("🦵 \(maxLegs) Legs")
+        }
+
+        if let longestFDP = rotation.longestFDP?.minutes, longestFDP >= 720 {
+            badges.append("⏱️ 12+ FDP")
+        }
+
+        return badges
     }
 
     private var dayText: String {
@@ -187,4 +257,3 @@ struct RotationCardView: View {
         return "\(monthName) \(day)"
     }
 }
-
