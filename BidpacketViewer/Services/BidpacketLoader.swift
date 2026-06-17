@@ -2,12 +2,11 @@
 //  BidpacketLoader.swift
 //  BidpacketViewer
 //
-//  Created by Robert Steward on 6/14/26.
-//
 
 import Foundation
 
 enum BidpacketLoader {
+
     static func loadSampleBidpacket() throws -> Bidpacket {
         guard let url = Bundle.main.url(
             forResource: "sample_bidpacket",
@@ -22,6 +21,13 @@ enum BidpacketLoader {
 
         let data = try Data(contentsOf: url)
 
+        let decoder = JSONDecoder()
+        let file = try decoder.decode(BidpacketFile.self, from: data)
+        return file.payload
+    }
+
+    // NEW
+    static func loadBidpacket(from data: Data) throws -> Bidpacket {
         let decoder = JSONDecoder()
         let file = try decoder.decode(BidpacketFile.self, from: data)
         return file.payload

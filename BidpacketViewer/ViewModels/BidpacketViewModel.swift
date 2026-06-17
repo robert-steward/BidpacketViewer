@@ -5,6 +5,7 @@ final class BidpacketViewModel {
     var bidpacket: Bidpacket?
     var selectedRotation: Rotation?
     var errorMessage: String?
+    var filters = RotationFilters()
 
     private var currentSelectionKey: String?
 
@@ -18,6 +19,12 @@ final class BidpacketViewModel {
         bidpacket?.results ?? []
     }
 
+    var filteredRotations: [Rotation] {
+        rotations.filter { rotation in
+            matchesFilters(rotation)
+        }
+    }
+    
     var selectedRotations: [Rotation] {
         rotations.filter { selectedRotationIDs.contains($0.id) }
     }
@@ -208,6 +215,22 @@ final class BidpacketViewModel {
             errorMessage = error.localizedDescription
         }
     }
+    
+    func loadFromData(_ data: Data) {
+        do {
+            let loaded = try BidpacketLoader.loadBidpacket(from: data)
+
+            bidpacket = loaded
+            selectedRotation = loaded.results.first
+
+            currentSelectionKey = makeSelectionKey(for: loaded)
+            loadSelectedRotationsForCurrentBidpacket()
+
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 
     func formatMinutesAsCredit(_ minutes: Int) -> String {
         let hours = minutes / 60
@@ -253,6 +276,115 @@ final class BidpacketViewModel {
         selectedRotationIDs = Set(ids)
     }
 
+    private func matchesFilters(_ rotation: Rotation) -> Bool {
+        if !filters.selectedDayLengths.isEmpty {
+            guard let numDays = rotation.numDays else {
+                return false
+            }
+
+            if !filters.selectedDayLengths.contains(numDays) {
+                return false
+            }
+        }
+
+        if filters.redEyeOnly && (rotation.numRedeyes ?? 0) == 0 {
+            return false
+        }
+
+        if filters.dayLayoverOnly && (rotation.dayLayovers ?? 0) == 0 {
+            return false
+        }
+
+        if filters.crossTownOnly && (rotation.xtownLayover ?? 0) == 0 {
+            return false
+        }
+
+        if filters.startsDeadheadOnly && rotation.frontDH != true {
+            return false
+        }
+
+        if filters.endsDeadheadOnly && rotation.backDH != true {
+            return false
+        }
+
+        if filters.fullyCommutableOnly && rotation.fullyCommutable != true {
+            return false
+        }
+
+        if filters.commuteInOnly && rotation.frontCommutable != true {
+            return false
+        }
+
+        if filters.commuteHomeOnly && rotation.backCommutable != true {
+            return false
+        }
+        if !filters.touchDateStrings.isEmpty {
+            let touchesAnySelectedDate = filters.touchDateStrings.contains { dateString in
+                guard let date = Self.filterDateFormatter.date(from: dateString) else {
+                    return false
+                }
+
+                return rotationTouchesDate(rotation, date)
+            }
+
+            switch filters.touchDateMode {
+            case .include:
+                if !touchesAnySelectedDate {
+                    return false
+                }
+
+            case .exclude:
+                if touchesAnySelectedDate {
+                    return false
+                }
+            }
+        }
+        return true
+    }
+    
+    private static let filterDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+    
+    private func rotationTouchesDate(_ rotation: Rotation, _ touchDate: Date) -> Bool {
+        guard let effectiveDates = rotation.effectiveDates,
+              let numDays = rotation.numDays else {
+            return false
+        }
+
+        let calendar = Calendar.current
+
+        let selectedDay = calendar.startOfDay(for: touchDate)
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = calendar.timeZone
+
+        for dateString in effectiveDates {
+            guard let startDate = formatter.date(from: dateString) else {
+                continue
+            }
+
+            let startDay = calendar.startOfDay(for: startDate)
+
+            guard let endDay = calendar.date(
+                byAdding: .day,
+                value: numDays - 1,
+                to: startDay
+            ) else {
+                continue
+            }
+
+            if selectedDay >= startDay && selectedDay <= endDay {
+                return true
+            }
+        }
+
+        return false
+    }
+    
     var baseSummaries: [BaseSummary] {
         guard let summaryByBase = bidpacket?.summaryByBase else {
             return []

@@ -24,7 +24,7 @@ struct DashboardView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                
+
                 Spacer()
             }
             .padding()
@@ -33,28 +33,31 @@ struct DashboardView: View {
             switch selectedWorkspace {
             case .browse:
                 BrowseWorkspaceView(viewModel: viewModel)
-                
+
             case .dashboard:
                 DashboardWorkspaceView(viewModel: viewModel)
-                
+
             case .downloads:
                 PlaceholderWorkspaceView(
                     title: "Downloads",
                     message: "This will eventually show available bid packets to download for offline use.",
                     systemImage: "icloud.and.arrow.down"
                 )
-                
+
             case .settings:
                 PlaceholderWorkspaceView(
                     title: "Settings",
                     message: "App preferences will live here.",
                     systemImage: "gearshape"
                 )
+
+            case .loginTest:
+                LoginTestView(viewModel: viewModel)
             }
         }
         .task {
-                    viewModel.loadSample()
-                }
+            viewModel.loadSample()
+        }
     }
 }
 
@@ -63,6 +66,7 @@ private enum AppWorkspace: String, CaseIterable, Identifiable {
     case dashboard
     case downloads
     case settings
+    case loginTest
 
     var id: String { rawValue }
 
@@ -72,6 +76,7 @@ private enum AppWorkspace: String, CaseIterable, Identifiable {
         case .dashboard: return "Dashboard"
         case .downloads: return "Downloads"
         case .settings: return "Settings"
+        case .loginTest: return "Login Test"
         }
     }
 
@@ -81,6 +86,7 @@ private enum AppWorkspace: String, CaseIterable, Identifiable {
         case .dashboard: return "chart.bar"
         case .downloads: return "icloud.and.arrow.down"
         case .settings: return "gearshape"
+        case .loginTest: return "lock.shield"
         }
     }
 }

@@ -9,31 +9,32 @@ struct BrowseWorkspaceView: View {
     @State private var searchText = ""
     @State private var showingSelectedOnly = false
     @State private var showScrollToTop = false
-    @State private var selectedDayFilter: DayLengthFilter = .all
     @State private var selectedSort: RotationSortOption = .rotationNumber
     @State private var sortAscending = true
     @State private var isHeaderCollapsed = false
+    @State private var dateToAdd = Date()
 
     private let topAnchorID = "top"
 
     private var sourceRotations: [Rotation] {
-        showingSelectedOnly ? viewModel.selectedRotations : viewModel.rotations
-    }
+        if showingSelectedOnly {
+            return viewModel.filteredRotations.filter {
+                viewModel.selectedRotationIDs.contains($0.id)
+            }
+        }
 
+        return viewModel.filteredRotations
+    }
+    
     private var filteredRotations: [Rotation] {
         let text = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let filtered = sourceRotations.filter { rotation in
-            let matchesSearch =
-                text.isEmpty ||
-                rotation.rotationNumber.localizedCaseInsensitiveContains(text) ||
-                rotation.overnights?.localizedCaseInsensitiveContains(text) == true ||
-                rotation.rawChunkText?.localizedCaseInsensitiveContains(text) == true ||
-                rotation.effectiveDates?.joined(separator: " ").localizedCaseInsensitiveContains(text) == true
-
-            let matchesDayFilter = selectedDayFilter.matches(rotation.numDays)
-
-            return matchesSearch && matchesDayFilter
+            text.isEmpty ||
+            rotation.rotationNumber.localizedCaseInsensitiveContains(text) ||
+            rotation.overnights?.localizedCaseInsensitiveContains(text) == true ||
+            rotation.rawChunkText?.localizedCaseInsensitiveContains(text) == true ||
+            rotation.effectiveDates?.joined(separator: " ").localizedCaseInsensitiveContains(text) == true
         }
 
         return selectedSort.sort(
@@ -42,7 +43,7 @@ struct BrowseWorkspaceView: View {
             ascending: sortAscending
         )
     }
-
+    
     var body: some View {
         ScrollViewReader { proxy in
             ZStack(alignment: .bottomTrailing) {
@@ -143,7 +144,11 @@ struct BrowseWorkspaceView: View {
                     .frame(width: 260)
                 }
 
-                dayFilterChips
+                VStack(alignment: .leading, spacing: 10) {
+                    dayFilterChips
+                    dateFilterSection
+                    operationalFilterChips
+                }
             }
         }
         .padding(.horizontal, 28)
@@ -155,6 +160,87 @@ struct BrowseWorkspaceView: View {
                 .foregroundStyle(.separator),
             alignment: .bottom
         )
+    }
+    
+    private var dateFilterSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Text("Touches Dates")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Picker("Mode", selection: $viewModel.filters.touchDateMode) {
+                    ForEach(TouchDateFilterMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+
+                DatePicker(
+                    "",
+                    selection: $dateToAdd,
+                    displayedComponents: .date
+                )
+                .labelsHidden()
+
+                Button("Add Date") {
+                    addTouchDate(dateToAdd)
+                }
+
+                if !viewModel.filters.touchDateStrings.isEmpty {
+                    Button("Clear Dates") {
+                        viewModel.filters.touchDateStrings.removeAll()
+                    }
+                    .font(.subheadline)
+                }
+            }
+
+            if !viewModel.filters.touchDateStrings.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(sortedTouchDateStrings, id: \.self) { dateString in
+                        Button {
+                            viewModel.filters.touchDateStrings.remove(dateString)
+                        } label: {
+                            Label(displayDate(dateString), systemImage: "xmark.circle.fill")
+                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color(.secondarySystemGroupedBackground))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+    
+    private var sortedTouchDateStrings: [String] {
+        viewModel.filters.touchDateStrings.sorted()
+    }
+
+    private func addTouchDate(_ date: Date) {
+        viewModel.filters.touchDateStrings.insert(dateString(date))
+    }
+
+    private func dateString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    private func displayDate(_ dateString: String) -> String {
+        let input = DateFormatter()
+        input.dateFormat = "yyyy-MM-dd"
+
+        guard let date = input.date(from: dateString) else {
+            return dateString
+        }
+
+        let output = DateFormatter()
+        output.dateFormat = "MMM d"
+        return output.string(from: date)
     }
     
     private var searchSection: some View {
@@ -189,18 +275,22 @@ struct BrowseWorkspaceView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            ForEach(DayLengthFilter.allCases) { filter in
+            ForEach([1, 2, 3, 4, 5], id: \.self) { days in
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
-                        selectedDayFilter = filter
+                        toggleDayLength(days)
                     }
                 } label: {
-                    Text(filter.title)
+                    Text(days == 5 ? "5+" : "\(days)")
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(selectedDayFilter == filter ? .blue : Color(.secondarySystemGroupedBackground))
-                        .foregroundStyle(selectedDayFilter == filter ? .white : .primary)
+                        .background(
+                            isDayLengthSelected(days)
+                            ? .blue
+                            : Color(.secondarySystemGroupedBackground)
+                        )
+                        .foregroundStyle(isDayLengthSelected(days) ? .white : .primary)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -208,15 +298,95 @@ struct BrowseWorkspaceView: View {
 
             Spacer()
 
-            if selectedDayFilter != .all {
-                Button("Clear Filter") {
-                    selectedDayFilter = .all
+            if viewModel.filters.hasActiveFilters {
+                Button("Clear Filters") {
+                    viewModel.filters.clearAll()
                 }
                 .font(.subheadline)
             }
         }
     }
+    
+    private var operationalFilterChips: some View {
+        HStack(spacing: 8) {
+            Text("Ops")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
+            filterChip("Red-eye", isOn: viewModel.filters.redEyeOnly) {
+                viewModel.filters.redEyeOnly.toggle()
+            }
+
+            filterChip("Day Layover", isOn: viewModel.filters.dayLayoverOnly) {
+                viewModel.filters.dayLayoverOnly.toggle()
+            }
+
+            filterChip("Cross-town", isOn: viewModel.filters.crossTownOnly) {
+                viewModel.filters.crossTownOnly.toggle()
+            }
+
+            filterChip("Starts DH", isOn: viewModel.filters.startsDeadheadOnly) {
+                viewModel.filters.startsDeadheadOnly.toggle()
+            }
+
+            filterChip("Ends DH", isOn: viewModel.filters.endsDeadheadOnly) {
+                viewModel.filters.endsDeadheadOnly.toggle()
+            }
+        }
+    }
+    
+    private func filterChip(
+        _ title: String,
+        isOn: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                action()
+            }
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(isOn ? .blue : Color(.secondarySystemGroupedBackground))
+                .foregroundStyle(isOn ? .white : .primary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func toggleDayLength(_ days: Int) {
+        if days == 5 {
+            toggleFivePlusDayLength()
+            return
+        }
+
+        if viewModel.filters.selectedDayLengths.contains(days) {
+            viewModel.filters.selectedDayLengths.remove(days)
+        } else {
+            viewModel.filters.selectedDayLengths.insert(days)
+        }
+    }
+
+    private func toggleFivePlusDayLength() {
+        let fivePlus = Set([5, 6, 7, 8, 9, 10])
+
+        if !viewModel.filters.selectedDayLengths.isDisjoint(with: fivePlus) {
+            viewModel.filters.selectedDayLengths.subtract(fivePlus)
+        } else {
+            viewModel.filters.selectedDayLengths.formUnion(fivePlus)
+        }
+    }
+
+    private func isDayLengthSelected(_ days: Int) -> Bool {
+        if days == 5 {
+            return viewModel.filters.selectedDayLengths.contains { $0 >= 5 }
+        }
+
+        return viewModel.filters.selectedDayLengths.contains(days)
+    }
+    
     private var rotationCardsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -347,43 +517,6 @@ struct BrowseWorkspaceView: View {
         formatter.dateFormat = "MMMM"
         let date = Calendar.current.date(from: DateComponents(year: 2026, month: month, day: 1))
         return date.map { formatter.string(from: $0) } ?? "\(month)"
-    }
-}
-
-private enum DayLengthFilter: String, CaseIterable, Identifiable {
-    case all
-    case one
-    case two
-    case three
-    case four
-    case fivePlus
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .all: return "All"
-        case .one: return "1"
-        case .two: return "2"
-        case .three: return "3"
-        case .four: return "4"
-        case .fivePlus: return "5+"
-        }
-    }
-
-    func matches(_ numDays: Int?) -> Bool {
-        guard let numDays else {
-            return self == .all
-        }
-
-        switch self {
-        case .all: return true
-        case .one: return numDays == 1
-        case .two: return numDays == 2
-        case .three: return numDays == 3
-        case .four: return numDays == 4
-        case .fivePlus: return numDays >= 5
-        }
     }
 }
 
