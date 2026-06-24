@@ -243,6 +243,7 @@ struct BrowseWorkspaceView: View {
                     ForEach(filteredRotations) { rotation in
                         RotationCardView(
                             rotation: rotation,
+                            selectedSorts: selectedSorts,
                             isExpanded: expandedRotationIDs.contains(rotation.id),
                             isSelected: viewModel.isSelected(rotation),
                             onToggleExpanded: {
@@ -471,7 +472,7 @@ struct BrowseWorkspaceView: View {
     }
 }
 
-private enum RotationSortOption: String, CaseIterable, Identifiable {
+enum RotationSortOption: String, CaseIterable, Identifiable {
     case rotationNumber
     case days
     case finalScore

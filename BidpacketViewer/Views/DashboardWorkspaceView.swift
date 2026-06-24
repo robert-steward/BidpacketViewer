@@ -20,30 +20,37 @@ struct DashboardWorkspaceView: View {
                     restSection
                 }
 
-                HStack(alignment: .top, spacing: 18) {
-                    circadianSection
-                    topOvernightsSection
-                }
                 
                 if viewModel.primaryBase == "NYC" || viewModel.primaryBase == "LAX" {
                     HStack(alignment: .top, spacing: 18) {
                         coTerminalSection
                     }
                 }
+                                
                 
-                HStack(alignment: .top, spacing: 18) {
-                    creditByLengthSection
-                    dutyMetricsSection
-                }
                 
                 HStack(alignment: .top, spacing: 18) {
                     rotationMixSection
                     rotationMixScoreSection
                 }
+                
+                
 
                 HStack(alignment: .top, spacing: 18) {
                     lastDutyOneLegSection
                 }
+                
+                
+                HStack(alignment: .top, spacing: 18) {
+                    creditByLengthSection
+                    dutyMetricsSection
+                }
+
+                HStack(alignment: .top, spacing: 18) {
+                    circadianSection
+                    topOvernightsSection
+                }
+
             }
             .padding(28)
         }

@@ -8,29 +8,35 @@ struct DownloadsWorkspaceView: View {
 
     @State private var statusMessage = "Not connected"
     @State private var isLoading = false
+    @State private var downloadingFileName: String?
+    
+    @State private var selectedBase = "ATL"
+    @State private var remoteFiles: [RemoteBidpacketFile] = []
+    @State private var localFiles: [URL] = []
 
-    private let testDownloadURL = "https://rotationscorer.alpa.org/bidpackets/sample_bidpacket.json"
+    private let bases = ["ATL", "BOS", "DTW", "LAX", "MSP", "NYC", "SEA", "SLC"]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            headerSection
-            loginSection
-            downloadSection
-            statusSection
-
-            Spacer()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                headerSection
+                loginSection
+                remoteBidpacketSection
+                localBidpacketSection
+                statusSection
+            }
+            .padding(28)
         }
-        .padding(28)
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Downloads")
+        .task {
+            refreshLocalFiles()
+        }
     }
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Downloads")
-                .font(.largeTitle.bold())
-
-            Text("Log in to download bid packets for offline use.")
+            Text("Download bid packets for offline use.")
                 .font(.title3)
                 .foregroundStyle(.secondary)
         }
@@ -38,8 +44,11 @@ struct DownloadsWorkspaceView: View {
 
     private var loginSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Server Login")
+            Text("Alpa Login")
                 .font(.headline)
+            Text("Use your ALPA credentials to access bidpacket downloads.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
 
             TextField("Username", text: $username)
                 .textFieldStyle(.roundedBorder)
@@ -56,29 +65,158 @@ struct DownloadsWorkspaceView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
-    private var downloadSection: some View {
+    private var remoteBidpacketSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Available Bid Packets")
-                .font(.headline)
+            HStack {
+                Text("Available Bid Packets")
+                    .font(.headline)
 
-            Text("For now this uses the existing test JSON file. Next step will be listing available files from the server.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                Spacer()
 
-            HStack(spacing: 12) {
-                Button(isLoading ? "Downloading..." : "Download Test Bidpacket") {
-                    downloadTestBidpacket()
+                Button(isLoading ? "Refreshing..." : "Refresh List") {
+                    refreshRemoteBidpackets()
                 }
                 .disabled(isLoading || username.isEmpty || password.isEmpty)
+            }
 
-                Button("Load Active Bidpacket") {
-                    loadActiveBidpacket()
+            Picker("Base", selection: $selectedBase) {
+                ForEach(bases, id: \.self) { base in
+                    Text(base).tag(base)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 620)
+            .onChange(of: selectedBase) {
+                remoteFiles = []
+
+                if !username.isEmpty && !password.isEmpty {
+                    refreshRemoteBidpackets()
+                }
+            }
+
+            if remoteFiles.isEmpty {
+                Text("No remote bid packets loaded yet. Choose a base and tap Refresh List.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(remoteFiles) { file in
+                        remoteFileRow(file)
+                    }
+                }
+            }
+
+            Text("Server list: /site_content/list_bidpackets.php?base=\(selectedBase)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func remoteFileRow(_ file: RemoteBidpacketFile) -> some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(file.title)
+                    .font(.headline)
+
+                HStack(spacing: 8) {
+                    Text(file.name)
+                    Text("•")
+                    Text(file.sizeText)
+
+                    if let modified = file.modified {
+                        Text("•")
+                        Text(modified)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button(downloadingFileName == file.name ? "Downloading..." : "Download") {
+                downloadBidpacket(file)
+            }
+            .disabled(isLoading || username.isEmpty || password.isEmpty)
+        }
+        .padding(14)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var localBidpacketSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Downloaded Bid Packets")
+                    .font(.headline)
+
+                Spacer()
+
+                Button("Refresh") {
+                    refreshLocalFiles()
+                }
+            }
+
+            if localFiles.isEmpty {
+                Text("No downloaded bid packets yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(localFiles, id: \.lastPathComponent) { fileURL in
+                        localFileRow(fileURL)
+                    }
                 }
             }
         }
         .padding(18)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func localFileRow(_ fileURL: URL) -> some View {
+        let fileName = fileURL.lastPathComponent
+        let isActive = LocalBidpacketStore.activeBidpacketFileName() == fileName
+
+        return HStack(spacing: 14) {
+            Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                .font(.title3)
+                .foregroundStyle(isActive ? .blue : .secondary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(fileName)
+                    .font(.headline)
+
+                Text(isActive ? "Active bidpacket" : "Downloaded")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button("Load") {
+                loadBidpacket(fileName: fileName)
+            }
+
+            Button("Set Active") {
+                LocalBidpacketStore.setActiveBidpacket(fileName: fileName)
+                refreshLocalFiles()
+                statusMessage = "Set active bidpacket: \(fileName)"
+            }
+            .disabled(isActive)
+
+            Button(role: .destructive) {
+                deleteLocalBidpacket(fileURL)
+            } label: {
+                Text("Delete")
+            }
+        }
+        .padding(14)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private var statusSection: some View {
@@ -101,9 +239,44 @@ struct DownloadsWorkspaceView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
-    private func downloadTestBidpacket() {
+    private func refreshRemoteBidpackets() {
         isLoading = true
-        statusMessage = "Connecting..."
+        statusMessage = "Fetching bidpacket list for \(selectedBase)..."
+
+        Task {
+            do {
+                let service = BidpacketDownloadService(
+                    username: username,
+                    password: password
+                )
+
+                let files = try await service.listBidpackets(base: selectedBase)
+
+                await MainActor.run {
+                    remoteFiles = files
+                    isLoading = false
+                    statusMessage = "Loaded \(files.count) available bidpacket(s) for \(selectedBase)."
+                }
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    remoteFiles = []
+                    statusMessage = """
+                    Unable to retrieve the bidpacket list.
+
+                    \(error.localizedDescription)
+
+                    Please verify your ALPA username and password and try again. If the problem persists, the server may be temporarily unavailable.
+                    """
+                }
+            }
+        }
+    }
+
+    private func downloadBidpacket(_ file: RemoteBidpacketFile) {
+        isLoading = true
+        downloadingFileName = file.name
+        statusMessage = "Downloading \(file.name)..."
 
         Task {
             do {
@@ -113,12 +286,13 @@ struct DownloadsWorkspaceView: View {
                 )
 
                 let data = try await service.downloadBidpacket(
-                    from: testDownloadURL
+                    base: selectedBase,
+                    fileName: file.name
                 )
 
                 let savedURL = try LocalBidpacketStore.save(
                     data,
-                    fileName: "sample_bidpacket.json"
+                    fileName: file.name
                 )
 
                 LocalBidpacketStore.setActiveBidpacket(
@@ -127,23 +301,23 @@ struct DownloadsWorkspaceView: View {
 
                 await MainActor.run {
                     isLoading = false
+                    downloadingFileName = nil
+                    refreshLocalFiles()
 
                     var output = ""
                     output += "Downloaded \(data.count) bytes\n"
                     output += "Saved as \(savedURL.lastPathComponent)\n"
-                    output += "Set as active bidpacket\n\n"
-
-                    if let preview = String(data: data.prefix(500), encoding: .utf8) {
-                        output += "Preview:\n\(preview)"
-                    }
+                    output += "Set as active bidpacket\n"
 
                     statusMessage = output
                 }
 
             } catch {
                 await MainActor.run {
+                    
                     isLoading = false
-                    statusMessage = "ERROR:\n\(error.localizedDescription)"
+                    downloadingFileName = nil
+                    statusMessage = "Download failed:\n\(error.localizedDescription)"
                 }
             }
         }
@@ -154,13 +328,53 @@ struct DownloadsWorkspaceView: View {
             let fileName = LocalBidpacketStore.activeBidpacketFileName()
                 ?? "sample_bidpacket.json"
 
-            let data = try LocalBidpacketStore.load(fileName: fileName)
-
-            viewModel.loadFromData(data)
+            try loadBidpacketFromStorage(fileName: fileName)
 
             statusMessage = "Loaded active bidpacket: \(fileName)"
         } catch {
             statusMessage = "Load failed:\n\(error.localizedDescription)"
+        }
+    }
+
+    private func loadBidpacket(fileName: String) {
+        do {
+            LocalBidpacketStore.setActiveBidpacket(fileName: fileName)
+            try loadBidpacketFromStorage(fileName: fileName)
+
+            refreshLocalFiles()
+            statusMessage = "Loaded bidpacket: \(fileName)"
+        } catch {
+            statusMessage = "Load failed:\n\(error.localizedDescription)"
+        }
+    }
+
+    private func loadBidpacketFromStorage(fileName: String) throws {
+        let data = try LocalBidpacketStore.load(fileName: fileName)
+        viewModel.loadFromData(data)
+    }
+
+    private func refreshLocalFiles() {
+        do {
+            localFiles = try LocalBidpacketStore.localFiles()
+        } catch {
+            statusMessage = "Failed to refresh local files:\n\(error.localizedDescription)"
+        }
+    }
+
+    private func deleteLocalBidpacket(_ fileURL: URL) {
+        let fileName = fileURL.lastPathComponent
+
+        do {
+            try FileManager.default.removeItem(at: fileURL)
+
+            if LocalBidpacketStore.activeBidpacketFileName() == fileName {
+                LocalBidpacketStore.setActiveBidpacket(fileName: "")
+            }
+
+            refreshLocalFiles()
+            statusMessage = "Deleted \(fileName)"
+        } catch {
+            statusMessage = "Delete failed:\n\(error.localizedDescription)"
         }
     }
 }

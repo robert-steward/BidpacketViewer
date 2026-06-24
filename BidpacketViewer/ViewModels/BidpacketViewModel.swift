@@ -517,6 +517,17 @@ final class BidpacketViewModel {
     }
 
     func loadSample() {
+        if let activeFileName = LocalBidpacketStore.activeBidpacketFileName(),
+           !activeFileName.isEmpty {
+            do {
+                let data = try LocalBidpacketStore.load(fileName: activeFileName)
+                loadFromData(data)
+                return
+            } catch {
+                errorMessage = "Could not load active bidpacket \(activeFileName). Loaded sample instead.\n\(error.localizedDescription)"
+            }
+        }
+
         do {
             let loaded = try BidpacketLoader.loadSampleBidpacket()
 
@@ -530,7 +541,6 @@ final class BidpacketViewModel {
             errorMessage = error.localizedDescription
         }
     }
-    
     
     func loadFromData(_ data: Data) {
         do {

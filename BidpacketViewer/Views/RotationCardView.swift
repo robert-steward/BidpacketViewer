@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RotationCardView: View {
     let rotation: Rotation
+    let selectedSorts: [RotationSortOption]
     let isExpanded: Bool
     let isSelected: Bool
     let onToggleExpanded: () -> Void
@@ -31,7 +32,7 @@ struct RotationCardView: View {
     }
 
     private var collapsedContent: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 14) {
                 Button {
                     onToggleSelected()
@@ -71,6 +72,8 @@ struct RotationCardView: View {
                     .foregroundStyle(.secondary)
             }
 
+            scoreStrip
+
             if let overnightSummary {
                 Text(overnightSummary)
                     .font(.subheadline)
@@ -82,8 +85,21 @@ struct RotationCardView: View {
         .contentShape(Rectangle())
     }
 
+    private var scoreStrip: some View {
+        HStack(spacing: 8) {
+            scorePill(title: "Final", value: rotation.finalScore)
+
+            ForEach(collapsedScoreItems, id: \.title) { item in
+                scorePill(title: item.title, value: item.value)
+            }
+        }
+        .padding(.leading, 136)
+    }
+
     private var expandedContent: some View {
         VStack(alignment: .leading, spacing: 10) {
+            fullScoreBreakdown
+
             if let overnightSummary {
                 infoPill(title: "Overnights", value: overnightSummary)
             }
@@ -97,6 +113,101 @@ struct RotationCardView: View {
             rawTextSection
         }
         .padding(.top, 4)
+    }
+
+    private var fullScoreBreakdown: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Scores")
+                .font(.headline)
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.adaptive(minimum: 140), spacing: 8)
+                ],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                scorePill(title: "Final", value: rotation.finalScore)
+                scorePill(title: "Legs", value: rotation.scoreParts?.legsScore)
+                scorePill(title: "Rest", value: rotation.scoreParts?.restScore)
+                scorePill(title: "In", value: rotation.scoreParts?.inScore)
+                scorePill(title: "Out", value: rotation.scoreParts?.outScore)
+                scorePill(title: "WOCL", value: rotation.scoreParts?.woclScore)
+                scorePill(title: "FDP / Max", value: rotation.scoreParts?.fdpOverMaxFDP)
+                scorePill(title: "Block / FDP", value: rotation.scoreParts?.blockOverFDP)
+                scorePill(title: "Block / Max", value: rotation.scoreParts?.blockOverMaxBlock)
+                scorePill(title: "Circadian", value: rotation.scoreParts?.cirSwapScore)
+                scorePill(title: "Turn", value: rotation.scoreParts?.turnScore)
+                scorePill(title: "Commute", value: rotation.scoreParts?.commutabilityScore)
+                scorePill(title: "Pay / TAFB", value: rotation.scoreParts?.payTafbScore)
+                scorePill(title: "DH", value: rotation.scoreParts?.dhScore)
+            }
+        }
+        .padding(12)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var collapsedScoreItems: [(title: String, value: Double?)] {
+        selectedSorts
+            .filter { $0 != .rotationNumber && $0 != .days && $0 != .finalScore }
+            .compactMap { scoreItem(for: $0) }
+    }
+
+    private func scoreItem(for option: RotationSortOption) -> (title: String, value: Double?)? {
+        switch option {
+        case .rotationNumber, .days:
+            return nil
+        case .finalScore:
+            return ("Final", rotation.finalScore)
+        case .legsScore:
+            return ("Legs", rotation.scoreParts?.legsScore)
+        case .restScore:
+            return ("Rest", rotation.scoreParts?.restScore)
+        case .inScore:
+            return ("In", rotation.scoreParts?.inScore)
+        case .outScore:
+            return ("Out", rotation.scoreParts?.outScore)
+        case .woclScore:
+            return ("WOCL", rotation.scoreParts?.woclScore)
+        case .fdpOverMaxFDP:
+            return ("FDP/Max", rotation.scoreParts?.fdpOverMaxFDP)
+        case .blockOverFDP:
+            return ("Blk/FDP", rotation.scoreParts?.blockOverFDP)
+        case .blockOverMaxBlock:
+            return ("Blk/Max", rotation.scoreParts?.blockOverMaxBlock)
+        case .circadianSwapScore:
+            return ("Circadian", rotation.scoreParts?.cirSwapScore)
+        case .turnScore:
+            return ("Turn", rotation.scoreParts?.turnScore)
+        case .commutabilityScore:
+            return ("Commute", rotation.scoreParts?.commutabilityScore)
+        case .payTafbScore:
+            return ("Pay/TAFB", rotation.scoreParts?.payTafbScore)
+        case .dhScore:
+            return ("DH", rotation.scoreParts?.dhScore)
+        }
+    }
+
+    private func scorePill(title: String, value: Double?) -> some View {
+        HStack(spacing: 5) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(formatScore(value))
+                .font(.caption.bold())
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(Color(.tertiarySystemGroupedBackground))
+        .clipShape(Capsule())
+    }
+
+    private func formatScore(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return String(format: "%.1f", value)
     }
 
     private var rawTextSection: some View {
