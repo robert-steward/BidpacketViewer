@@ -1,63 +1,173 @@
 import Foundation
 
+
 struct BidpacketFile: Decodable {
-    let id: String?
+    let base: String?
     let name: String?
-    let savedAt: String?
     let payload: Bidpacket
 
     enum CodingKeys: String, CodingKey {
-        case id
+        case base
         case name
-        case savedAt = "saved_at"
         case payload
+    }
+
+    var aircraft: String {
+        guard let name else { return "—" }
+        return String(name.split(separator: "_").first ?? "—")
     }
 }
 
 struct Bidpacket: Decodable {
-    let aircraft: String?
-    let bidpacketYear: Int?
-    let bidpacketMonth: Int?
-    let bidpacketDate: String?
-    let summary: BidpacketSummary?
-    let summaryByBase: [String: BaseSummary]?
+    let summaryByBase: PacketSummary?
+    let summaryBase: SummaryBase?
     let results: [Rotation]
 
     enum CodingKeys: String, CodingKey {
-        case aircraft
-        case bidpacketYear = "bidpacket_year"
-        case bidpacketMonth = "bidpacket_month"
-        case bidpacketDate = "bidpacket_date"
-        case summary
         case summaryByBase = "summary_by_base"
+        case summaryBase = "summary_base"
         case results
     }
 }
 
-struct BidpacketSummary: Decodable {
-    let averageScore: Double?
-    let rotationCount: Int?
+struct SummaryBase: Decodable {
+    let rotationMix: RotationMixTargets?
+    let weights: [String: ScoringWeightSet]?
 
     enum CodingKeys: String, CodingKey {
-        case averageScore = "avg_all"
-        case rotationCount = "count"
+        case rotationMix = "rotation_mix"
+        case weights
     }
 }
 
-struct BaseSummary: Decodable, Identifiable {
-    var id: String { base }
+struct RotationMixTargets: Decodable {
+    let oneDay: Double?
+    let twoDay: Double?
+    let threeDay: Double?
+    let fourDay: Double?
+    let fiveDay: Double?
+    let sixPlusDay: Double?
 
-    let base: String
+    enum CodingKeys: String, CodingKey {
+        case oneDay = "one_day"
+        case twoDay = "two_day"
+        case threeDay = "three_day"
+        case fourDay = "four_day"
+        case fiveDay = "five_day"
+        case sixPlusDay = "six_plus_day"
+    }
+}
+
+struct ScoringWeightSet: Decodable {
+    let rotationMixWeight: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case rotationMixWeight = "rotation_mix_score"
+    }
+}
+struct PacketSummary: Decodable {
+    let base: String?
     let averageScore: Double?
-    let rotationCount: Int?
+    let count: Int?
+    let countUnique: Int?
+
+    let redeyesTotal: Int?
+    let xtownLayoversTotal: Int?
+    let dayLayoversTotal: Int?
+    let dayLayoversDHOnlyTotal: Int?
+
+    let avgByDays: [String: SummaryByDay]?
+    let avgRestNoRedeye: SummaryRest?
+    let avgRestWithRedeye: SummaryRest?
+
+    let circadianSwaps: SummaryCircadianSwaps?
+    let mitigatedCircadianSwaps: SummaryCircadianSwaps?
+    let commutability: SummaryCommutability?
+    let commuteWindow: SummaryCommuteWindow?
 
     enum CodingKeys: String, CodingKey {
         case base
         case averageScore = "avg_all"
-        case rotationCount = "count"
+        case count
+        case countUnique = "count_unique"
+
+        case redeyesTotal = "redeyes_total"
+        case xtownLayoversTotal = "xtown_layovers_total"
+        case dayLayoversTotal = "day_layovers_total"
+        case dayLayoversDHOnlyTotal = "day_layovers_dh_only_total"
+
+        case avgByDays = "avg_by_days"
+        case avgRestNoRedeye = "avg_rest_to_next_no_redeye"
+        case avgRestWithRedeye = "avg_rest_to_next_wredeye"
+
+        case circadianSwaps = "circadian_swaps"
+        case mitigatedCircadianSwaps = "mitigated_circadian_swaps"
+        case commutability
+        case commuteWindow = "commute_window"
     }
 }
 
+struct SummaryByDay: Decodable {
+    let averageScore: Double?
+    let count: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case averageScore = "avg"
+        case count
+    }
+}
+
+struct SummaryRest: Decodable {
+    let hm: String?
+    let minutes: Int?
+    let overnightsCount: Int?
+    let rotationsCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case hm
+        case minutes
+        case overnightsCount = "overnights_count"
+        case rotationsCount = "rotations_count"
+    }
+}
+
+struct SummaryCircadianSwaps: Decodable {
+    let amToPm: Int?
+    let pmToAm: Int?
+    let redeyeToAm: Int?
+    let total: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case amToPm = "am_to_pm"
+        case pmToAm = "pm_to_am"
+        case redeyeToAm = "redeye_to_am"
+        case total
+    }
+}
+
+struct SummaryCommutability: Decodable {
+    let frontOnly: Int?
+    let backOnly: Int?
+    let fullyCommutable: Int?
+    let notCommutable: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case frontOnly = "front_only"
+        case backOnly = "back_only"
+        case fullyCommutable = "fully_commutable"
+        case notCommutable = "not_commutable"
+    }
+}
+
+struct SummaryCommuteWindow: Decodable {
+    let backNoLaterThan: String?
+    let frontNoEarlierThan: String?
+
+    enum CodingKeys: String, CodingKey {
+        case backNoLaterThan = "back_no_later_than"
+        case frontNoEarlierThan = "front_no_earlier_than"
+    }
+}
 struct Rotation: Decodable, Identifiable {
     var id: String {
         "\(rotationNumber)-\(base ?? "")-\(position ?? "")"

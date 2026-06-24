@@ -7,10 +7,12 @@ struct BrowseWorkspaceView: View {
     @State private var searchText = ""
     @State private var showingSelectedOnly = false
     @State private var showScrollToTop = false
-    @State private var selectedSort: RotationSortOption = .rotationNumber
+    @State private var selectedSorts: [RotationSortOption] = [.rotationNumber]
     @State private var sortAscending = true
     @State private var isHeaderCollapsed = false
     @State private var showingFilters = false
+    @State private var showingSortOptions = false
+    @State private var selectedExportURL: URL?
 
     private let topAnchorID = "top"
 
@@ -35,9 +37,9 @@ struct BrowseWorkspaceView: View {
             rotation.effectiveDates?.joined(separator: " ").localizedCaseInsensitiveContains(text) == true
         }
 
-        return selectedSort.sort(
+        return RotationSortOption.sort(
             filtered,
-            selectedIDs: viewModel.selectedRotationIDs,
+            by: selectedSorts,
             ascending: sortAscending
         )
     }
@@ -98,13 +100,11 @@ struct BrowseWorkspaceView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(viewModel.primaryBase) \(viewModel.bidpacket?.aircraft ?? "Unknown Aircraft")")
+                    Text("\(viewModel.primaryBase) \(viewModel.aircraft)")
                         .font(.system(size: isHeaderCollapsed ? 22 : 34, weight: .bold))
 
-                    if !isHeaderCollapsed,
-                       let month = viewModel.bidpacket?.bidpacketMonth,
-                       let year = viewModel.bidpacket?.bidpacketYear {
-                        Text(monthName(month) + " " + String(year))
+                    if !isHeaderCollapsed {
+                        Text(viewModel.bidpacketName ?? "Bidpacket")
                             .font(.title3)
                             .foregroundStyle(.secondary)
                     }
@@ -156,7 +156,7 @@ struct BrowseWorkspaceView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
-                    .popover(isPresented: $showingFilters) {
+                    .sheet(isPresented: $showingFilters) {
                         FilterPanelView(viewModel: viewModel)
                     }
                 }
@@ -173,14 +173,167 @@ struct BrowseWorkspaceView: View {
         )
     }
 
+    private var rotationCardsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 14) {
+                Text(sectionTitle)
+                    .font(.title2)
+                    .bold()
+
+                Text("\(filteredRotations.count)")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Button {
+                    showingSortOptions = true
+                } label: {
+                    Label("Sort", systemImage: "arrow.up.arrow.down")
+                }
+                .popover(isPresented: $showingSortOptions) {
+                    sortOptionsPopover
+                }
+
+                toolbarDivider
+
+                Button("Select") {
+                    for rotation in filteredRotations {
+                        viewModel.selectedRotationIDs.insert(rotation.id)
+                    }
+                }
+
+                Button("Deselect") {
+                    let visibleIDs = Set(filteredRotations.map { $0.id })
+                    viewModel.selectedRotationIDs.subtract(visibleIDs)
+                }
+
+                toolbarDivider
+
+                Button("Export") {
+                    selectedExportURL = makeSelectedRotationsExportFile()
+                }
+                .disabled(viewModel.selectedRotations.isEmpty)
+
+                toolbarDivider
+
+                Button("Expand") {
+                    expandedRotationIDs = Set(filteredRotations.map { $0.id })
+                }
+
+                Button("Collapse") {
+                    expandedRotationIDs.removeAll()
+                }
+            }
+            .font(.subheadline)
+
+            if let selectedExportURL {
+                ShareLink(
+                    item: selectedExportURL,
+                    preview: SharePreview("Selected Rotations")
+                ) {
+                    Label("Share Export File", systemImage: "square.and.arrow.up")
+                }
+            }
+
+            if filteredRotations.isEmpty {
+                emptyState
+            } else {
+                LazyVStack(spacing: 10) {
+                    ForEach(filteredRotations) { rotation in
+                        RotationCardView(
+                            rotation: rotation,
+                            isExpanded: expandedRotationIDs.contains(rotation.id),
+                            isSelected: viewModel.isSelected(rotation),
+                            onToggleExpanded: {
+                                if expandedRotationIDs.contains(rotation.id) {
+                                    expandedRotationIDs.remove(rotation.id)
+                                } else {
+                                    expandedRotationIDs.insert(rotation.id)
+                                }
+                            },
+                            onToggleSelected: {
+                                viewModel.toggleSelected(rotation)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private var sortOptionsPopover: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button {
+                        sortAscending.toggle()
+                    } label: {
+                        Label(
+                            sortAscending ? "Ascending" : "Descending",
+                            systemImage: sortAscending ? "arrow.up" : "arrow.down"
+                        )
+                    }
+                }
+
+                Section("Sort Priority") {
+                    ForEach(RotationSortOption.allCases) { option in
+                        Button {
+                            toggleSortOption(option)
+                        } label: {
+                            HStack {
+                                Text(option.title)
+
+                                Spacer()
+
+                                if let index = selectedSorts.firstIndex(of: option) {
+                                    Text("\(index + 1)")
+                                        .font(.caption.bold())
+                                        .foregroundStyle(.white)
+                                        .frame(width: 24, height: 24)
+                                        .background(.blue)
+                                        .clipShape(Circle())
+
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        .foregroundStyle(.primary)
+                    }
+                }
+
+                Section {
+                    Button("Reset to Rotation Number") {
+                        selectedSorts = [.rotationNumber]
+                    }
+                }
+            }
+            .navigationTitle("Sort Rotations")
+            .navigationBarTitleDisplayMode(.inline)
+            .frame(width: 380, height: 640)
+        }
+    }
+
+    private func toggleSortOption(_ option: RotationSortOption) {
+        if let index = selectedSorts.firstIndex(of: option) {
+            selectedSorts.remove(at: index)
+
+            if selectedSorts.isEmpty {
+                selectedSorts = [.rotationNumber]
+            }
+        } else {
+            selectedSorts.append(option)
+        }
+    }
+
+    private var toolbarDivider: some View {
+        Divider()
+            .frame(height: 18)
+    }
+
     private var filterButtonTitle: String {
         let count = activeFilterCount
-
-        if count == 0 {
-            return "Filters"
-        }
-
-        return "Filters (\(count))"
+        return count == 0 ? "Filters" : "Filters (\(count))"
     }
 
     private var activeFilterCount: Int {
@@ -226,78 +379,44 @@ struct BrowseWorkspaceView: View {
         .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
     }
 
-    private var rotationCardsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(sectionTitle)
-                    .font(.title2)
-                    .bold()
+    private func makeSelectedRotationsExportFile() -> URL? {
+        let selected = viewModel.selectedRotations.sorted {
+            $0.rotationNumber.localizedStandardCompare($1.rotationNumber) == .orderedAscending
+        }
 
-                Text("\(filteredRotations.count)")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
+        guard !selected.isEmpty else {
+            return nil
+        }
 
-                Spacer()
+        let header = """
+        BidpacketViewer Selected Rotations
+        Packet: \(viewModel.bidpacketName ?? "Unknown")
+        Base/Aircraft: \(viewModel.primaryBase) \(viewModel.aircraft)
+        Selected Rotations: \(selected.count)
+        Exported: \(Date().formatted(date: .abbreviated, time: .shortened))
 
-                Menu {
-                    ForEach(RotationSortOption.allCases) { option in
-                        Button {
-                            selectedSort = option
-                        } label: {
-                            if selectedSort == option {
-                                Label(option.title, systemImage: "checkmark")
-                            } else {
-                                Text(option.title)
-                            }
-                        }
-                    }
 
-                    Divider()
+        """
 
-                    Button {
-                        sortAscending.toggle()
-                    } label: {
-                        Label(
-                            sortAscending ? "Ascending" : "Descending",
-                            systemImage: sortAscending ? "arrow.up" : "arrow.down"
-                        )
-                    }
-                } label: {
-                    Label("Sort", systemImage: "arrow.up.arrow.down")
-                }
+        let body = selected.map { rotation in
+            rotation.rawChunkText ?? "#\(rotation.rotationNumber)"
+        }
+        .joined(separator: "\n\n------------------------------------------------------------\n\n")
 
-                Button("Expand All") {
-                    expandedRotationIDs = Set(filteredRotations.map { $0.id })
-                }
+        let safePacketName = (viewModel.bidpacketName ?? "bidpacket")
+            .replacingOccurrences(of: " ", with: "_")
+            .replacingOccurrences(of: "/", with: "-")
 
-                Button("Collapse All") {
-                    expandedRotationIDs.removeAll()
-                }
-            }
+        let fileName = "selected_rotations_\(safePacketName).txt"
 
-            if filteredRotations.isEmpty {
-                emptyState
-            } else {
-                LazyVStack(spacing: 10) {
-                    ForEach(filteredRotations) { rotation in
-                        RotationCardView(
-                            rotation: rotation,
-                            isExpanded: expandedRotationIDs.contains(rotation.id),
-                            isSelected: viewModel.isSelected(rotation),
-                            onToggleExpanded: {
-                                if expandedRotationIDs.contains(rotation.id) {
-                                    expandedRotationIDs.remove(rotation.id)
-                                } else {
-                                    expandedRotationIDs.insert(rotation.id)
-                                }
-                            },
-                            onToggleSelected: {
-                                viewModel.toggleSelected(rotation)
-                            }
-                        )
-                    }
-                }
-            }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+
+        do {
+            try (header + body).write(to: url, atomically: true, encoding: .utf8)
+            return url
+        } catch {
+            print("Failed to write selected rotations export:", error)
+            return nil
         }
     }
 
@@ -350,21 +469,25 @@ struct BrowseWorkspaceView: View {
             }
         }
     }
-
-    private func monthName(_ month: Int) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM"
-        let date = Calendar.current.date(from: DateComponents(year: 2026, month: month, day: 1))
-        return date.map { formatter.string(from: $0) } ?? "\(month)"
-    }
 }
 
 private enum RotationSortOption: String, CaseIterable, Identifiable {
     case rotationNumber
     case days
-    case credit
-    case firstStartDate
-    case selectedFirst
+    case finalScore
+    case legsScore
+    case restScore
+    case inScore
+    case outScore
+    case woclScore
+    case fdpOverMaxFDP
+    case blockOverFDP
+    case blockOverMaxBlock
+    case circadianSwapScore
+    case turnScore
+    case commutabilityScore
+    case payTafbScore
+    case dhScore
 
     var id: String { rawValue }
 
@@ -372,59 +495,111 @@ private enum RotationSortOption: String, CaseIterable, Identifiable {
         switch self {
         case .rotationNumber: return "Rotation Number"
         case .days: return "Days"
-        case .credit: return "Credit"
-        case .firstStartDate: return "First Start Date"
-        case .selectedFirst: return "Selected First"
+        case .finalScore: return "Final Score"
+        case .legsScore: return "Legs Score"
+        case .restScore: return "Rest Score"
+        case .inScore: return "In Score"
+        case .outScore: return "Out Score"
+        case .woclScore: return "WOCL Score"
+        case .fdpOverMaxFDP: return "FDP / Max FDP"
+        case .blockOverFDP: return "Block / FDP"
+        case .blockOverMaxBlock: return "Block / Max Block"
+        case .circadianSwapScore: return "Circadian Swap"
+        case .turnScore: return "Turn Score"
+        case .commutabilityScore: return "Commutability"
+        case .payTafbScore: return "Pay / TAFB"
+        case .dhScore: return "DH Score"
         }
     }
 
-    func sort(
+    static func sort(
         _ rotations: [Rotation],
-        selectedIDs: Set<String>,
+        by options: [RotationSortOption],
         ascending: Bool
     ) -> [Rotation] {
-        let sorted: [Rotation]
+        rotations.sorted { left, right in
+            for option in options {
+                let result = option.compare(left, right)
 
+                if result != .orderedSame {
+                    return ascending
+                    ? result == .orderedAscending
+                    : result == .orderedDescending
+                }
+            }
+
+            return left.rotationNumber.localizedStandardCompare(right.rotationNumber) == .orderedAscending
+        }
+    }
+
+    private func compare(_ left: Rotation, _ right: Rotation) -> ComparisonResult {
         switch self {
         case .rotationNumber:
-            sorted = rotations.sorted {
-                $0.rotationNumber.localizedStandardCompare($1.rotationNumber) == .orderedAscending
-            }
+            return left.rotationNumber.localizedStandardCompare(right.rotationNumber)
 
         case .days:
-            sorted = rotations.sorted {
-                ($0.numDays ?? 0, $0.rotationNumber) < ($1.numDays ?? 0, $1.rotationNumber)
-            }
+            return compareValues(left.numDays, right.numDays)
 
-        case .credit:
-            sorted = rotations.sorted {
-                ($0.totalCredit?.minutes ?? 0, $0.rotationNumber) < ($1.totalCredit?.minutes ?? 0, $1.rotationNumber)
-            }
+        case .finalScore:
+            return compareValues(left.finalScore, right.finalScore)
 
-        case .firstStartDate:
-            sorted = rotations.sorted {
-                ($0.effectiveDates?.first ?? "9999-99-99", $0.rotationNumber) <
-                ($1.effectiveDates?.first ?? "9999-99-99", $1.rotationNumber)
-            }
+        case .legsScore:
+            return compareValues(left.scoreParts?.legsScore, right.scoreParts?.legsScore)
 
-        case .selectedFirst:
-            sorted = rotations.sorted {
-                let leftSelected = selectedIDs.contains($0.id)
-                let rightSelected = selectedIDs.contains($1.id)
+        case .restScore:
+            return compareValues(left.scoreParts?.restScore, right.scoreParts?.restScore)
 
-                if leftSelected != rightSelected {
-                    return leftSelected && !rightSelected
-                }
+        case .inScore:
+            return compareValues(left.scoreParts?.inScore, right.scoreParts?.inScore)
 
-                return $0.rotationNumber.localizedStandardCompare($1.rotationNumber) == .orderedAscending
-            }
+        case .outScore:
+            return compareValues(left.scoreParts?.outScore, right.scoreParts?.outScore)
+
+        case .woclScore:
+            return compareValues(left.scoreParts?.woclScore, right.scoreParts?.woclScore)
+
+        case .fdpOverMaxFDP:
+            return compareValues(left.scoreParts?.fdpOverMaxFDP, right.scoreParts?.fdpOverMaxFDP)
+
+        case .blockOverFDP:
+            return compareValues(left.scoreParts?.blockOverFDP, right.scoreParts?.blockOverFDP)
+
+        case .blockOverMaxBlock:
+            return compareValues(left.scoreParts?.blockOverMaxBlock, right.scoreParts?.blockOverMaxBlock)
+
+        case .circadianSwapScore:
+            return compareValues(left.scoreParts?.cirSwapScore, right.scoreParts?.cirSwapScore)
+
+        case .turnScore:
+            return compareValues(left.scoreParts?.turnScore, right.scoreParts?.turnScore)
+
+        case .commutabilityScore:
+            return compareValues(left.scoreParts?.commutabilityScore, right.scoreParts?.commutabilityScore)
+
+        case .payTafbScore:
+            return compareValues(left.scoreParts?.payTafbScore, right.scoreParts?.payTafbScore)
+
+        case .dhScore:
+            return compareValues(left.scoreParts?.dhScore, right.scoreParts?.dhScore)
         }
+    }
 
-        if self == .selectedFirst {
-            return sorted
+    private func compareValues<T: Comparable>(_ left: T?, _ right: T?) -> ComparisonResult {
+        switch (left, right) {
+        case let (left?, right?):
+            if left < right { return .orderedAscending }
+            if left > right { return .orderedDescending }
+            return .orderedSame
+
+        case (nil, nil):
+            return .orderedSame
+
+        case (nil, _):
+            return .orderedDescending
+
+        case (_, nil):
+            return .orderedAscending
         }
-
-        return ascending ? sorted : sorted.reversed()
     }
 }
 

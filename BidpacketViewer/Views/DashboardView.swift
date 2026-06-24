@@ -3,9 +3,10 @@ import SwiftUI
 struct DashboardView: View {
     @State private var viewModel = BidpacketViewModel()
     @State private var selectedWorkspace: AppWorkspace = .browse
+    @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(AppWorkspace.allCases) { workspace in
                     Button {
@@ -38,21 +39,12 @@ struct DashboardView: View {
                 DashboardWorkspaceView(viewModel: viewModel)
 
             case .downloads:
-                PlaceholderWorkspaceView(
-                    title: "Downloads",
-                    message: "This will eventually show available bid packets to download for offline use.",
-                    systemImage: "icloud.and.arrow.down"
-                )
-
+                DownloadsWorkspaceView(viewModel: viewModel)
+                
             case .settings:
-                PlaceholderWorkspaceView(
-                    title: "Settings",
-                    message: "App preferences will live here.",
-                    systemImage: "gearshape"
-                )
+                SettingsWorkspaceView()
 
-            case .loginTest:
-                LoginTestView(viewModel: viewModel)
+            
             }
         }
         .task {
@@ -66,7 +58,7 @@ private enum AppWorkspace: String, CaseIterable, Identifiable {
     case dashboard
     case downloads
     case settings
-    case loginTest
+    
 
     var id: String { rawValue }
 
@@ -76,7 +68,7 @@ private enum AppWorkspace: String, CaseIterable, Identifiable {
         case .dashboard: return "Dashboard"
         case .downloads: return "Downloads"
         case .settings: return "Settings"
-        case .loginTest: return "Login Test"
+        
         }
     }
 
@@ -86,7 +78,7 @@ private enum AppWorkspace: String, CaseIterable, Identifiable {
         case .dashboard: return "chart.bar"
         case .downloads: return "icloud.and.arrow.down"
         case .settings: return "gearshape"
-        case .loginTest: return "lock.shield"
+        
         }
     }
 }
