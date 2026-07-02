@@ -2,13 +2,17 @@ import SwiftUI
 
 struct DashboardWorkspaceView: View {
     @Bindable var viewModel: BidpacketViewModel
+    @AppStorage("dashboardExcludeShortCommutability") private var excludeShortCommutability = true
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 headerSection
                 topSummarySection
-                selectedPlanSection
+
+                if viewModel.selectedCount > 0 {
+                    selectedPlanSection
+                }
 
                 HStack(alignment: .top, spacing: 18) {
                     rotationMixSection
@@ -226,13 +230,9 @@ struct DashboardWorkspaceView: View {
     private var selectedPlanSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Current Plan")
+                Text("Selected Rotations")
                     .font(.title2.bold())
 
-                Spacer()
-
-                Text("⭐")
-                    .font(.title2)
             }
 
             HStack(spacing: 28) {
@@ -279,12 +279,23 @@ struct DashboardWorkspaceView: View {
     }
 
     private var commutabilitySection: some View {
-        dashboardGroup(title: "Commutability") {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack {
+                Text("Commutability")
+                    .font(.title2.bold())
+
+                Spacer()
+
+                Toggle("Exclude 1 & 2 day", isOn: $excludeShortCommutability)
+                    .font(.caption)
+                    .toggleStyle(.switch)
+            }
+
             VStack(spacing: 16) {
-                coloredBarRow("🟢", "Fully", count: viewModel.fullyCommutableCount)
-                coloredBarRow("🟡", "Front-only", count: viewModel.frontOnlyCommutableCount)
-                coloredBarRow("🔵", "Back-only", count: viewModel.backOnlyCommutableCount)
-                coloredBarRow("⚪️", "Not Commutable", count: viewModel.notCommutableCount)
+                coloredBarRow("🟢", "Fully", count: dashboardFullyCommutableCount, total: dashboardCommutabilityTotal)
+                coloredBarRow("🟡", "Front-only", count: dashboardFrontOnlyCommutableCount, total: dashboardCommutabilityTotal)
+                coloredBarRow("🔵", "Back-only", count: dashboardBackOnlyCommutableCount, total: dashboardCommutabilityTotal)
+                coloredBarRow("⚪️", "Not Commutable", count: dashboardNotCommutableCount, total: dashboardCommutabilityTotal)
 
                 Divider()
 
@@ -292,8 +303,13 @@ struct DashboardWorkspaceView: View {
                 iconStatRow("🛬", "Back no later than", viewModel.backNoLaterThan)
             }
         }
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(.background)
+        .clipShape(RoundedRectangle(cornerRadius: 22))
     }
-
+    
+    
     private var restSection: some View {
         dashboardGroup(title: "Average Rest") {
             VStack(spacing: 16) {
@@ -312,6 +328,57 @@ struct DashboardWorkspaceView: View {
         }
     }
 
+    
+    private var dashboardCommutabilityRotations: [Rotation] {
+        viewModel.rotations.filter { rotation in
+            !excludeShortCommutability || (rotation.numDays ?? 0) >= 3
+        }
+    }
+
+    private var dashboardCommutabilityTotal: Int {
+        dashboardCommutabilityRotations.reduce(0) {
+            $0 + viewModel.occurrenceWeight($1)
+        }
+    }
+
+    private var dashboardFullyCommutableCount: Int {
+        dashboardCommutabilityRotations.reduce(0) { total, rotation in
+            total + ((rotation.fullyCommutable == true) ? viewModel.occurrenceWeight(rotation) : 0)
+        }
+    }
+
+    private var dashboardFrontOnlyCommutableCount: Int {
+        dashboardCommutabilityRotations.reduce(0) { total, rotation in
+            let isFrontOnly =
+                rotation.frontCommutable == true &&
+                rotation.backCommutable != true &&
+                rotation.fullyCommutable != true
+
+            return total + (isFrontOnly ? viewModel.occurrenceWeight(rotation) : 0)
+        }
+    }
+
+    private var dashboardBackOnlyCommutableCount: Int {
+        dashboardCommutabilityRotations.reduce(0) { total, rotation in
+            let isBackOnly =
+                rotation.backCommutable == true &&
+                rotation.frontCommutable != true &&
+                rotation.fullyCommutable != true
+
+            return total + (isBackOnly ? viewModel.occurrenceWeight(rotation) : 0)
+        }
+    }
+
+    private var dashboardNotCommutableCount: Int {
+        dashboardCommutabilityRotations.reduce(0) { total, rotation in
+            let isCommutable =
+                rotation.frontCommutable == true ||
+                rotation.backCommutable == true ||
+                rotation.fullyCommutable == true
+
+            return total + (!isCommutable ? viewModel.occurrenceWeight(rotation) : 0)
+        }
+    }
     private var circadianSection: some View {
         dashboardGroup(title: "Circadian Swaps") {
             VStack(spacing: 16) {
@@ -366,6 +433,8 @@ struct DashboardWorkspaceView: View {
                 )
             }
     }
+    
+    
 
     private func compactMetric(_ title: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -463,9 +532,14 @@ struct DashboardWorkspaceView: View {
         }
     }
 
-    private func coloredBarRow(_ icon: String, _ label: String, count: Int) -> some View {
-        let total = max(viewModel.instanceCount, 1)
-        let percent = Double(count) / Double(total)
+    private func coloredBarRow(
+        _ icon: String,
+        _ label: String,
+        count: Int,
+        total: Int? = nil
+    ) -> some View {
+        let denominator = max(total ?? viewModel.instanceCount, 1)
+        let percent = Double(count) / Double(denominator)
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -488,7 +562,7 @@ struct DashboardWorkspaceView: View {
                 .scaleEffect(x: 1, y: 1.7, anchor: .center)
         }
     }
-
+    
     private func iconStatRow(_ icon: String, _ label: String, _ value: String) -> some View {
         HStack(spacing: 12) {
             Text(icon)

@@ -137,10 +137,16 @@ struct DownloadsWorkspaceView: View {
 
             Spacer()
 
-            Button(downloadingFileName == file.name ? "Downloading..." : "Download") {
-                downloadBidpacket(file)
+            if isDownloaded(file) {
+                Label("Downloaded", systemImage: "checkmark.circle.fill")
+                    .font(.headline)
+                    .foregroundStyle(.green)
+            } else {
+                Button(downloadingFileName == file.name ? "Downloading..." : "Download") {
+                    downloadBidpacket(file)
+                }
+                .disabled(isLoading || username.isEmpty || password.isEmpty)
             }
-            .disabled(isLoading || username.isEmpty || password.isEmpty)
         }
         .padding(14)
         .background(Color(.systemBackground))
@@ -197,16 +203,11 @@ struct DownloadsWorkspaceView: View {
 
             Spacer()
 
-            Button("Load") {
-                loadBidpacket(fileName: fileName)
+            if !isActive {
+                Button("Load") {
+                    loadBidpacket(fileName: fileName)
+                }
             }
-
-            Button("Set Active") {
-                LocalBidpacketStore.setActiveBidpacket(fileName: fileName)
-                refreshLocalFiles()
-                statusMessage = "Set active bidpacket: \(fileName)"
-            }
-            .disabled(isActive)
 
             Button(role: .destructive) {
                 deleteLocalBidpacket(fileURL)
@@ -218,7 +219,7 @@ struct DownloadsWorkspaceView: View {
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
-
+    
     private var statusSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Status")
@@ -290,13 +291,11 @@ struct DownloadsWorkspaceView: View {
                     fileName: file.name
                 )
 
-                let localFileName = "\(selectedBase)_\(file.name)"
-
                 let savedURL = try LocalBidpacketStore.save(
                     data,
-                    fileName: localFileName
+                    fileName: downloadedFileName(for: file)
                 )
-
+                
                 LocalBidpacketStore.setActiveBidpacket(
                     fileName: savedURL.lastPathComponent
                 )
@@ -363,6 +362,18 @@ struct DownloadsWorkspaceView: View {
         }
     }
 
+    private func downloadedFileName(for file: RemoteBidpacketFile) -> String {
+        "\(selectedBase)_\(file.name)"
+    }
+
+    private func isDownloaded(_ file: RemoteBidpacketFile) -> Bool {
+        let expectedFileName = downloadedFileName(for: file)
+
+        return localFiles.contains { localFile in
+            localFile.lastPathComponent == expectedFileName
+        }
+    }
+    
     private func deleteLocalBidpacket(_ fileURL: URL) {
         let fileName = fileURL.lastPathComponent
 

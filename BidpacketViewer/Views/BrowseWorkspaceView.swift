@@ -93,7 +93,7 @@ struct BrowseWorkspaceView: View {
             }
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle("Browse")
+        .navigationTitle("Rotations")
     }
 
     private var frozenTopSection: some View {

@@ -64,7 +64,7 @@ private enum AppWorkspace: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .browse: return "Browse"
+        case .browse: return "Rotations"
         case .dashboard: return "Dashboard"
         case .downloads: return "Downloads"
         case .settings: return "Settings"

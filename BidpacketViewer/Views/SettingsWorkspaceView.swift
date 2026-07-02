@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsWorkspaceView: View {
     @AppStorage("pilotBase") private var pilotBase: String = "LAX"
+    @AppStorage("appearanceMode") private var appearanceMode: String = "system"
 
     private let bases = ["ATL", "BOS", "DTW", "LAX", "MSP", "NYC", "SEA", "SLC"]
 
@@ -15,6 +16,18 @@ struct SettingsWorkspaceView: View {
                 }
 
                 Text("This is your pilot home base. It will be used later for downloads, defaults, and commute-related features.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Section("Display") {
+                Picker("Mode", selection: $appearanceMode) {
+                    Text("Day").tag("day")
+                    Text("Night").tag("night")
+                }
+                .pickerStyle(.segmented)
+
+                Text("Night mode is easier on your eyes when viewing bidpackets in a dark cockpit or cabin.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
