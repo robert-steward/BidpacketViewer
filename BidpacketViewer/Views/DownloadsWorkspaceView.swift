@@ -290,9 +290,11 @@ struct DownloadsWorkspaceView: View {
                     fileName: file.name
                 )
 
+                let localFileName = "\(selectedBase)_\(file.name)"
+
                 let savedURL = try LocalBidpacketStore.save(
                     data,
-                    fileName: file.name
+                    fileName: localFileName
                 )
 
                 LocalBidpacketStore.setActiveBidpacket(

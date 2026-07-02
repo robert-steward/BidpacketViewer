@@ -49,7 +49,8 @@ struct FilterPanelView: View {
                 selectedDateComponents = dateComponentsFromFilterStrings()
             }
         }
-        .frame(width: 820, height: 900)
+        .frame(width: 820)
+        .frame(maxHeight: 5000)
     }
 
     

@@ -17,7 +17,7 @@ struct LoadedBidpacket {
 }
 
 enum BidpacketLoader {
-
+    
     static func loadSampleBidpacket() throws -> LoadedBidpacket {
         guard let url = Bundle.main.url(
             forResource: "sample_bidpacket",
@@ -29,21 +29,30 @@ enum BidpacketLoader {
                 userInfo: [NSLocalizedDescriptionKey: "sample_bidpacket.json not found"]
             )
         }
-
+        
         let data = try Data(contentsOf: url)
         return try loadBidpacketPackage(from: data)
     }
-
+    
     static func loadBidpacket(from data: Data) throws -> LoadedBidpacket {
         try loadBidpacketPackage(from: data)
     }
-
+    
     private static func loadBidpacketPackage(from data: Data) throws -> LoadedBidpacket {
         let decoder = JSONDecoder()
         let file = try decoder.decode(BidpacketFile.self, from: data)
-
+        
+        var bidpacket = file.payload
+        
+        let packetName = file.name ?? "bidpacket"
+        
+        for index in bidpacket.results.indices {
+            bidpacket.results[index].id =
+            "\(packetName)-\(String(format: "%06d", index + 1))"
+        }
+        
         return LoadedBidpacket(
-            bidpacket: file.payload,
+            bidpacket: bidpacket,
             name: file.name,
             base: file.base
         )

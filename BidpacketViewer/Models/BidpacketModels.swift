@@ -21,7 +21,7 @@ struct BidpacketFile: Decodable {
 struct Bidpacket: Decodable {
     let summaryByBase: PacketSummary?
     let summaryBase: SummaryBase?
-    let results: [Rotation]
+    var results: [Rotation]
 
     enum CodingKeys: String, CodingKey {
         case summaryByBase = "summary_by_base"
@@ -169,9 +169,8 @@ struct SummaryCommuteWindow: Decodable {
     }
 }
 struct Rotation: Decodable, Identifiable {
-    var id: String {
-        "\(rotationNumber)-\(base ?? "")-\(position ?? "")"
-    }
+    var id: String = ""
+    
 
     let rotationNumber: String
     let base: String?
