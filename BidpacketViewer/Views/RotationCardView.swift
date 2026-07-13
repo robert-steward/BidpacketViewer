@@ -7,6 +7,13 @@ struct RotationCardView: View {
     let isSelected: Bool
     let onToggleExpanded: () -> Void
     let onToggleSelected: () -> Void
+    @AppStorage("showRedeyeBadge") private var showRedeyeBadge = true
+    @AppStorage("showDayLayoverBadge") private var showDayLayoverBadge = true
+    @AppStorage("showCrossTownBadge") private var showCrossTownBadge = true
+    @AppStorage("showDeadheadBadge") private var showDeadheadBadge = true
+    @AppStorage("showCommutabilityBadge") private var showCommutabilityBadge = true
+    @AppStorage("showLegsBadge") private var showLegsBadge = true
+    @AppStorage("showLongFDPBadge") private var showLongFDPBadge = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -264,45 +271,49 @@ struct RotationCardView: View {
     private var infoBadges: [String] {
         var badges: [String] = []
 
-        if (rotation.numRedeyes ?? 0) > 0 {
+        if showRedeyeBadge, (rotation.numRedeyes ?? 0) > 0 {
             badges.append("🌙 Red-eye")
         }
 
-        if (rotation.dayLayovers ?? 0) > 0 {
+        if showDayLayoverBadge, (rotation.dayLayovers ?? 0) > 0 {
             badges.append("🏨 Day Layover")
         }
 
-        if (rotation.xtownLayover ?? 0) > 0 {
+        if showCrossTownBadge, (rotation.xtownLayover ?? 0) > 0 {
             badges.append("🚕 Cross-town")
         }
 
-        if rotation.frontDH == true && rotation.backDH == true {
-            badges.append("🚌 Front/Back DH")
-        } else if rotation.frontDH == true {
-            badges.append("🚌 Front DH")
-        } else if rotation.backDH == true {
-            badges.append("🚌 Back DH")
+        if showDeadheadBadge {
+            if rotation.frontDH == true && rotation.backDH == true {
+                badges.append("🚌 Front/Back DH")
+            } else if rotation.frontDH == true {
+                badges.append("🚌 Front DH")
+            } else if rotation.backDH == true {
+                badges.append("🚌 Back DH")
+            }
         }
 
-        if rotation.fullyCommutable == true {
-            badges.append("✅ Full")
-        } else if rotation.frontCommutable == true {
-            badges.append("⬆️ Front")
-        } else if rotation.backCommutable == true {
-            badges.append("⬇️ Back")
+        if showCommutabilityBadge {
+            if rotation.fullyCommutable == true {
+                badges.append("✅ Full")
+            } else if rotation.frontCommutable == true {
+                badges.append("⬆️ Front")
+            } else if rotation.backCommutable == true {
+                badges.append("⬇️ Back")
+            }
         }
 
-        if let maxLegs = rotation.maxLegs, maxLegs >= 4 {
+        if showLegsBadge, let maxLegs = rotation.maxLegs, maxLegs >= 4 {
             badges.append("🦵 \(maxLegs) Legs")
         }
 
-        if let longestFDP = rotation.longestFDP?.minutes, longestFDP >= 720 {
+        if showLongFDPBadge, let longestFDP = rotation.longestFDP?.minutes, longestFDP >= 720 {
             badges.append("⏱️ 12+ FDP")
         }
 
         return badges
     }
-
+    
     private var dayText: String {
         let days = rotation.numDays ?? 0
         return days == 1 ? "1 Day" : "\(days) Days"

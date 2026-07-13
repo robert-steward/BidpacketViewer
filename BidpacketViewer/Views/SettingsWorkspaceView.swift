@@ -3,6 +3,13 @@ import SwiftUI
 struct SettingsWorkspaceView: View {
     @AppStorage("pilotBase") private var pilotBase: String = "LAX"
     @AppStorage("appearanceMode") private var appearanceMode: String = "system"
+    @AppStorage("showRedeyeBadge") private var showRedeyeBadge = true
+    @AppStorage("showDayLayoverBadge") private var showDayLayoverBadge = true
+    @AppStorage("showCrossTownBadge") private var showCrossTownBadge = true
+    @AppStorage("showDeadheadBadge") private var showDeadheadBadge = true
+    @AppStorage("showCommutabilityBadge") private var showCommutabilityBadge = true
+    @AppStorage("showLegsBadge") private var showLegsBadge = true
+    @AppStorage("showLongFDPBadge") private var showLongFDPBadge = true
 
     private let bases = ["ATL", "BOS", "DTW", "LAX", "MSP", "NYC", "SEA", "SLC"]
 
@@ -32,6 +39,20 @@ struct SettingsWorkspaceView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Rotation Card Tags") {
+                Toggle("Red-eye", isOn: $showRedeyeBadge)
+                Toggle("Day Layover", isOn: $showDayLayoverBadge)
+                Toggle("Cross-town", isOn: $showCrossTownBadge)
+                Toggle("Deadhead", isOn: $showDeadheadBadge)
+                Toggle("Commutability", isOn: $showCommutabilityBadge)
+                Toggle("Leg-heavy", isOn: $showLegsBadge)
+                Toggle("Long FDP", isOn: $showLongFDPBadge)
+
+                Text("Choose which tags appear on rotation cards.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            
             Section("Data") {
                 Button(role: .destructive) {
                     clearSavedSelections()

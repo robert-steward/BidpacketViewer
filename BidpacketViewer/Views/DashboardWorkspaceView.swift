@@ -54,12 +54,69 @@ struct DashboardWorkspaceView: View {
                     circadianSection
                     topOvernightsSection
                 }
+                
+                HStack(alignment: .top, spacing: 18) {
+                    regionMixSection
+                }
 
             }
             .padding(28)
         }
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Dashboard")
+    }
+    
+    private var regionMixSection: some View {
+        dashboardGroup(title: "Region Mix") {
+            VStack(spacing: 16) {
+                ForEach(regionMixRows, id: \.region) { item in
+                    largeBarRow(
+                        label: item.region,
+                        primaryValue: "\(item.count)",
+                        secondaryValue: percentText(item.percent),
+                        count: item.count,
+                        total: max(viewModel.instanceCount, 1)
+                    )
+                }
+            }
+        }
+    }
+    
+    private var regionMixRows: [(region: String, count: Int, percent: Double)] {
+        var counts: [String: Int] = [:]
+        let total = max(viewModel.instanceCount, 1)
+
+        for rotation in viewModel.rotations {
+            let weight = viewModel.occurrenceWeight(rotation)
+
+            guard let touches = rotation.touches, !touches.isEmpty else {
+                continue
+            }
+
+            let regions = AirportLookup.shared.regions(for: touches.keys)
+
+            if regions.isEmpty {
+                continue
+            }
+
+            if regions == ["Domestic"] {
+                counts["Domestic", default: 0] += weight
+            } else {
+                for region in regions where region != "Domestic" {
+                    counts[region, default: 0] += weight
+                }
+            }
+        }
+
+        return counts
+            .map { region, count in
+                (
+                    region: region,
+                    count: count,
+                    percent: Double(count) / Double(total)
+                )
+            }
+            .sorted { $0.count > $1.count }
     }
     
     private var rotationMixScoreSection: some View {

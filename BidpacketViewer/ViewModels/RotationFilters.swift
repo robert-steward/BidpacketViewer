@@ -93,6 +93,7 @@ enum ComparisonFilterMode: String, CaseIterable, Identifiable {
     case greaterThanOrEqual
     case lessThanOrEqual
     case equalTo
+    case between
 
     var id: String { rawValue }
 
@@ -102,9 +103,11 @@ enum ComparisonFilterMode: String, CaseIterable, Identifiable {
         case .greaterThanOrEqual: return "≥"
         case .lessThanOrEqual: return "≤"
         case .equalTo: return "="
+        case .between: return "Between"
         }
     }
 }
+
 
 enum BooleanChoiceFilterMode: String, CaseIterable, Identifiable {
     case any
@@ -121,6 +124,9 @@ enum BooleanChoiceFilterMode: String, CaseIterable, Identifiable {
         }
     }
 }
+
+
+    
 
 struct RotationFilters {
     // MARK: - Basic
@@ -141,6 +147,7 @@ struct RotationFilters {
     var crossTownOnly = false
     var startsDeadheadOnly = false
     var endsDeadheadOnly = false
+    
 
     var fullyCommutableOnly = false
     var commuteInOnly = false
@@ -163,6 +170,7 @@ struct RotationFilters {
     var checkInStationText: String = ""
     var overnightStationText: String = ""
     var touchesStationText: String = ""
+    var selectedRegions: Set<String> = []
 
     // MARK: - Numeric Filters
 
@@ -205,6 +213,9 @@ struct RotationFilters {
 
     var releaseMode: ComparisonFilterMode = .all
     var releaseMinutes: Int?
+    
+    var checkInEndMinutes: Int?
+    var releaseEndMinutes: Int?
 
     // MARK: - Efficiency
 
@@ -233,6 +244,7 @@ struct RotationFilters {
 
     var hasActiveFilters: Bool {
         !selectedDayLengths.isEmpty ||
+        !selectedRegions.isEmpty ||
         !selectedStartDays.isEmpty ||
         redeyeFilterMode != .all ||
         !startDateString.isEmpty ||
@@ -279,8 +291,9 @@ struct RotationFilters {
         layoverLengthMinMinutes != nil ||
         layoverLengthMaxMinutes != nil ||
         checkInMode != .all ||
+        checkInEndMinutes != nil ||
         releaseMode != .all ||
-
+        releaseEndMinutes != nil ||
         dutyEfficiencyMode != .all ||
 
         fdpRecoveryRestMinutes != nil ||
@@ -295,6 +308,7 @@ struct RotationFilters {
         selectedDayLengths.removeAll()
         selectedStartDays.removeAll()
         startDateString = ""
+        selectedRegions.removeAll()
 
         weekendTouchMode = .all
         redeyeFilterMode = .all
@@ -305,6 +319,8 @@ struct RotationFilters {
         edpPayMinimum = nil
         holPayMinimum = nil
         carvePayMinimum = nil
+        checkInEndMinutes = nil
+        releaseEndMinutes = nil
 
         selectedBase = ""
         selectedPosition = ""

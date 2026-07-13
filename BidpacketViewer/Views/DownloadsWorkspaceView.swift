@@ -3,8 +3,8 @@ import SwiftUI
 struct DownloadsWorkspaceView: View {
     @Bindable var viewModel: BidpacketViewModel
 
-    @State private var username = ""
-    @State private var password = ""
+    @AppStorage("alpaUsername") private var username = ""
+    @AppStorage("alpaPassword") private var password = ""
 
     @State private var statusMessage = "Not connected"
     @State private var isLoading = false
@@ -303,12 +303,14 @@ struct DownloadsWorkspaceView: View {
                 await MainActor.run {
                     isLoading = false
                     downloadingFileName = nil
-                    refreshLocalFiles()
+
+                    loadBidpacket(fileName: savedURL.lastPathComponent)
 
                     var output = ""
                     output += "Downloaded \(data.count) bytes\n"
                     output += "Saved as \(savedURL.lastPathComponent)\n"
                     output += "Set as active bidpacket\n"
+                    output += "Loaded bidpacket\n"
 
                     statusMessage = output
                 }

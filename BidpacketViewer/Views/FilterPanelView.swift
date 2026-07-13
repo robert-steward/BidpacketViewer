@@ -7,10 +7,26 @@
 
 import SwiftUI
 
+private let availableRegions = [
+    "Domestic",
+    "Hawaii",
+    "Alaska",
+    "Canada",
+    "Mexico/Caribbean",
+    "Caribbean",
+    "Europe",
+    "Pacific",
+    "South America",
+    "Africa",
+    "Middle East"
+]
+
 struct FilterPanelView: View {
     @Bindable var viewModel: BidpacketViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var selectedDateComponents: Set<DateComponents> = []
+    
+
     
     
 
@@ -329,8 +345,74 @@ struct FilterPanelView: View {
                     placeholder: "e.g. ATL",
                     text: $viewModel.filters.touchesStationText
                 )
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    
+                    Text("Regions")
+                        .font(.headline)
+                        
+
+                    Menu {
+                        ForEach(availableRegions, id: \.self) { region in
+                            Button {
+                                toggleRegion(region)
+                            } label: {
+                                if viewModel.filters.selectedRegions.contains(region) {
+                                    Label(region, systemImage: "checkmark")
+                                } else {
+                                    Text(region)
+                                }
+                            }
+                        }
+
+                        if !viewModel.filters.selectedRegions.isEmpty {
+                            Divider()
+
+                            Button("Clear Regions", role: .destructive) {
+                                viewModel.filters.selectedRegions.removeAll()
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(regionMenuTitle)
+                                .foregroundStyle(viewModel.filters.selectedRegions.isEmpty ? .secondary : .primary)
+
+                            Spacer()
+
+                            Image(systemName: "chevron.down")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(Color(.systemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                }
             }
         }
+    }
+    
+    private func toggleRegion(_ region: String) {
+        if viewModel.filters.selectedRegions.contains(region) {
+            viewModel.filters.selectedRegions.remove(region)
+        } else {
+            viewModel.filters.selectedRegions.insert(region)
+        }
+    }
+    
+    private var regionMenuTitle: String {
+        if viewModel.filters.selectedRegions.isEmpty {
+            return "Any region"
+        }
+
+        let selected = viewModel.filters.selectedRegions.sorted()
+
+        if selected.count <= 2 {
+            return selected.joined(separator: ", ")
+        }
+
+        return "\(selected.count) regions selected"
     }
 
 
@@ -419,16 +501,18 @@ struct FilterPanelView: View {
                     }
                 }
                 
-                comparisonMinutesRow(
+                comparisonMinutesRangeRow(
                     title: "Check-in",
                     mode: $viewModel.filters.checkInMode,
-                    minutes: $viewModel.filters.checkInMinutes
+                    startMinutes: $viewModel.filters.checkInMinutes,
+                    endMinutes: $viewModel.filters.checkInEndMinutes
                 )
 
-                comparisonMinutesRow(
+                comparisonMinutesRangeRow(
                     title: "Release",
                     mode: $viewModel.filters.releaseMode,
-                    minutes: $viewModel.filters.releaseMinutes
+                    startMinutes: $viewModel.filters.releaseMinutes,
+                    endMinutes: $viewModel.filters.releaseEndMinutes
                 )
                 
                 LazyVGrid(
@@ -449,6 +533,66 @@ struct FilterPanelView: View {
                         text: $viewModel.filters.selectedPosition
                     )
                 }
+            }
+        }
+    }
+    
+    private func comparisonMinutesRangeRow(
+        title: String,
+        mode: Binding<ComparisonFilterMode>,
+        startMinutes: Binding<Int?>,
+        endMinutes: Binding<Int?>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 150, alignment: .leading)
+
+                Picker(title, selection: mode) {
+                    ForEach(ComparisonFilterMode.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 150)
+
+                optionalHoursField(minutes: startMinutes)
+                    .frame(width: 80)
+
+                Text("hh")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                optionalMinutesRemainderField(minutes: startMinutes)
+                    .frame(width: 80)
+
+                Text("mm")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if mode.wrappedValue == .between {
+                    Text("and")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 8)
+
+                    optionalHoursField(minutes: endMinutes)
+                        .frame(width: 80)
+
+                    Text("hh")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    optionalMinutesRemainderField(minutes: endMinutes)
+                        .frame(width: 80)
+
+                    Text("mm")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
             }
         }
     }
@@ -473,6 +617,28 @@ struct FilterPanelView: View {
         }
         .buttonStyle(.plain)
     }
+    
+    private func regionChip(_ region: String) -> some View {
+        let selected = viewModel.filters.selectedRegions.contains(region)
+
+        return Button {
+            if selected {
+                viewModel.filters.selectedRegions.remove(region)
+            } else {
+                viewModel.filters.selectedRegions.insert(region)
+            }
+        } label: {
+            Text(region)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(selected ? .blue : Color(.systemBackground))
+                .foregroundStyle(selected ? .white : .primary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+    
     private var creditSection: some View {
         filterGroup(title: "Credit / Time") {
             VStack(alignment: .leading, spacing: 18) {
@@ -960,6 +1126,8 @@ struct FilterPanelView: View {
         )
     }
 }
+
+
 
 #Preview {
     FilterPanelView(viewModel: BidpacketViewModel())

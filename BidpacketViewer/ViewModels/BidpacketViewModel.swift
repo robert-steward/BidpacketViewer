@@ -391,6 +391,43 @@ final class BidpacketViewModel {
             ("6+", actualPercent { ($0.numDays ?? 0) >= 6 }, targets?.sixPlusDay ?? 0)
         ]
     }
+    
+    var regionStats: [(region: String, count: Int, percent: Double)] {
+        var counts: [String: Int] = [:]
+        let totalInstances = instanceCount
+
+        guard totalInstances > 0 else {
+            return []
+        }
+
+        for rotation in rotations {
+            let weight = occurrenceWeight(rotation)
+
+            let regions = AirportLookup.shared.regions(for: rotation)
+
+            if regions.isEmpty {
+                continue
+            }
+
+            if regions == ["Domestic"] {
+                counts["Domestic", default: 0] += weight
+            } else {
+                for region in regions where region != "Domestic" {
+                    counts[region, default: 0] += weight
+                }
+            }
+        }
+        
+        return counts
+            .map { region, count in
+                (
+                    region: region,
+                    count: count,
+                    percent: Double(count) / Double(totalInstances)
+                )
+            }
+            .sorted { $0.count > $1.count }
+    }
 
     var rotationMixScore: Double {
         let deadband = 2.0
@@ -743,7 +780,19 @@ final class BidpacketViewModel {
                 return false
             }
         }
+        if !filters.selectedRegions.isEmpty {
 
+            let touchedStations = rotation.touches.map { Array($0.keys) } ?? []
+
+            let rotationRegions = AirportLookup.shared.regions(
+                for: touchedStations
+            )
+
+            if filters.selectedRegions.isDisjoint(with: rotationRegions) {
+                return false
+            }
+        }
+        
         if filters.redEyeOnly {
             if (rotation.numRedeyes ?? 0) <= 0 {
                 return false
@@ -821,22 +870,24 @@ final class BidpacketViewModel {
         ) {
             return false
         }
-        if !passesComparison(
-            value: minutesFromClockString(rotation.checkIn),
-            mode: filters.checkInMode,
-            target: filters.checkInMinutes
-        ) {
-            return false
-        }
-
-        if !passesComparison(
+        if !passesTimeComparison(
             value: minutesFromClockString(rotation.checkOut),
             mode: filters.releaseMode,
-            target: filters.releaseMinutes
+            start: filters.releaseMinutes,
+            end: filters.releaseEndMinutes
         ) {
             return false
         }
-
+        
+        if !passesTimeComparison(
+            value: minutesFromClockString(rotation.checkIn),
+            mode: filters.checkInMode,
+            start: filters.checkInMinutes,
+            end: filters.checkInEndMinutes
+        ) {
+            return false
+        }
+        
         if !passesComparison(
             value: rotation.totalCredit?.minutes,
             mode: filters.totalCreditMode,
@@ -996,6 +1047,70 @@ final class BidpacketViewModel {
         return true
     }
     
+    private func passesComparison<T: Comparable>(
+        value: T?,
+        mode: ComparisonFilterMode,
+        target: T?
+    ) -> Bool {
+        guard mode != .all else {
+            return true
+        }
+
+        guard let value, let target else {
+            return false
+        }
+
+        switch mode {
+        case .all:
+            return true
+        case .greaterThanOrEqual:
+            return value >= target
+        case .lessThanOrEqual:
+            return value <= target
+        case .equalTo:
+            return value == target
+        case .between:
+            return value >= target
+        }
+    }
+    
+    private func passesTimeComparison(
+        value: Int?,
+        mode: ComparisonFilterMode,
+        start: Int?,
+        end: Int?
+    ) -> Bool {
+        guard mode != .all else {
+            return true
+        }
+
+        guard let value else {
+            return false
+        }
+
+        switch mode {
+        case .all:
+            return true
+
+        case .greaterThanOrEqual:
+            guard let start else { return false }
+            return value >= start
+
+        case .lessThanOrEqual:
+            guard let start else { return false }
+            return value <= start
+
+        case .equalTo:
+            guard let start else { return false }
+            return value == start
+
+        case .between:
+            guard let start, let end else { return false }
+            let lower = min(start, end)
+            let upper = max(start, end)
+            return value >= lower && value <= upper
+        }
+    }
     private func matchesExtraPayFilter(_ rotation: Rotation) -> Bool {
 
         if let minimum = filters.sitPayMinimum {
@@ -1047,31 +1162,7 @@ final class BidpacketViewModel {
     }
     
     
-    private func passesComparison<T: Comparable>(
-        value: T?,
-        mode: ComparisonFilterMode,
-        target: T?
-    ) -> Bool {
-        guard mode != .all else {
-            return true
-        }
-
-        guard let value, let target else {
-            return false
-        }
-
-        switch mode {
-        case .all:
-            return true
-        case .greaterThanOrEqual:
-            return value >= target
-        case .lessThanOrEqual:
-            return value <= target
-        case .equalTo:
-            return value == target
-        }
-    }
-    
+     
     private func minutesFromClockString(_ value: String?) -> Int? {
         guard let value else {
             return nil
