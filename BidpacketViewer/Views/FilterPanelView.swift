@@ -23,12 +23,9 @@ private let availableRegions = [
 
 struct FilterPanelView: View {
     @Bindable var viewModel: BidpacketViewModel
+
     @Environment(\.dismiss) private var dismiss
     @State private var selectedDateComponents: Set<DateComponents> = []
-    
-
-    
-    
 
     var body: some View {
         NavigationStack {
@@ -69,256 +66,197 @@ struct FilterPanelView: View {
         .frame(maxHeight: 5000)
     }
 
-    
-    private var extraPaySection: some View {
-        filterGroup(title: "Extra Pay") {
+    // MARK: - Trip
 
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible())
-                ],
-                spacing: 14
-            ) {
-
-                minimumPayField(
-                    title: "SIT ≥",
-                    value: $viewModel.filters.sitPayMinimum
-                )
-
-                minimumPayField(
-                    title: "EDP ≥",
-                    value: $viewModel.filters.edpPayMinimum
-                )
-
-                minimumPayField(
-                    title: "HOL ≥",
-                    value: $viewModel.filters.holPayMinimum
-                )
-
-                minimumPayField(
-                    title: "CARVE ≥",
-                    value: $viewModel.filters.carvePayMinimum
-                )
-            }
-        }
-    }
-    
-    private func minimumPayField(
-        title: String,
-        value: Binding<Double?>
-    ) -> some View {
-
-        TextField(
-            title,
-            text: Binding(
-                get: {
-                    if let value = value.wrappedValue {
-                        return String(format: "%.1f", value)
-                    }
-
-                    return ""
-                },
-                set: { newValue in
-                    value.wrappedValue = Double(newValue)
-                }
-            )
-        )
-        .keyboardType(.decimalPad)
-        .textFieldStyle(.roundedBorder)
-    }
-
-    private var recoverySection: some View {
-        filterGroup(title: "Recovery") {
+    private var tripSection: some View {
+        filterGroup(title: "Trip") {
             VStack(alignment: .leading, spacing: 18) {
-                recoveryMinutesRow(
-                    title: "FDP Recovery",
-                    restMinutes: $viewModel.filters.fdpRecoveryRestMinutes,
-                    triggerMinutes: $viewModel.filters.fdpRecoveryFDPMinutes,
-                    triggerLabel: "after FDP ≥"
+                HStack(spacing: 10) {
+                    dayChip(1, title: "1 Day")
+                    dayChip(2, title: "2 Day")
+                    dayChip(3, title: "3 Day")
+                    dayChip(4, title: "4 Day")
+                    dayChip(5, title: "5+ Day")
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    filterLabel("Start Day", glossaryTerm: "Start Day")
+
+                    HStack(spacing: 10) {
+                        startDayChip("Mon")
+                        startDayChip("Tue")
+                        startDayChip("Wed")
+                        startDayChip("Thu")
+                        startDayChip("Fri")
+                        startDayChip("Sat")
+                        startDayChip("Sun")
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    filterLabel(
+                        "Weekend Touch",
+                        glossaryTerm: "Touches Weekend",
+                        font: .subheadline.weight(.semibold),
+                        secondary: false
+                    )
+
+                    Picker(
+                        "Weekend Touch",
+                        selection: $viewModel.filters.weekendTouchMode
+                    ) {
+                        ForEach(WeekendTouchFilterMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                comparisonIntRow(
+                    title: "Duty Periods",
+                    glossaryTerm: "Duty Period",
+                    mode: $viewModel.filters.dutyPeriodsMode,
+                    value: $viewModel.filters.dutyPeriodsValue,
+                    placeholder: "#"
                 )
 
-                recoveryIntRow(
-                    title: "Legs Recovery",
-                    restMinutes: $viewModel.filters.legsRecoveryRestMinutes,
-                    triggerValue: $viewModel.filters.legsRecoveryLegsBefore,
-                    triggerLabel: "after legs ≥"
+                comparisonIntRow(
+                    title: "Max Legs",
+                    mode: $viewModel.filters.maxLegsMode,
+                    value: $viewModel.filters.maxLegsValue,
+                    placeholder: "#"
                 )
 
-                recoveryMinutesRow(
-                    title: "Block Recovery",
-                    restMinutes: $viewModel.filters.blockRecoveryRestMinutes,
-                    triggerMinutes: $viewModel.filters.blockRecoveryBlockMinutes,
-                    triggerLabel: "after block ≥"
+                comparisonIntRow(
+                    title: "Frequency",
+                    glossaryTerm: "Frequency",
+                    mode: $viewModel.filters.frequencyMode,
+                    value: $viewModel.filters.frequencyValue,
+                    placeholder: "#"
                 )
+
+                VStack(alignment: .leading, spacing: 10) {
+                    filterLabel(
+                        "Leg-heavy Days",
+                        glossaryTerm: "Leg-heavy Days"
+                    )
+
+                    HStack(spacing: 12) {
+                        Text("At least")
+
+                        optionalIntField(
+                            placeholder: "Days",
+                            value: $viewModel.filters.daysWithLegsDaysValue
+                        )
+                        .frame(width: 90)
+
+                        Text("days with")
+
+                        optionalIntField(
+                            placeholder: "Legs",
+                            value: $viewModel.filters.daysWithLegsLegsValue
+                        )
+                        .frame(width: 90)
+
+                        Text("or more legs")
+
+                        Spacer()
+                    }
+                }
+
+                dailyBlockFilterRow
+
+                comparisonMinutesRangeRow(
+                    title: "Check-in",
+                    glossaryTerm: "Check-in",
+                    mode: $viewModel.filters.checkInMode,
+                    startMinutes: $viewModel.filters.checkInMinutes,
+                    endMinutes: $viewModel.filters.checkInEndMinutes
+                )
+
+                comparisonMinutesRangeRow(
+                    title: "Release",
+                    glossaryTerm: "Release",
+                    mode: $viewModel.filters.releaseMode,
+                    startMinutes: $viewModel.filters.releaseMinutes,
+                    endMinutes: $viewModel.filters.releaseEndMinutes
+                )
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(.adaptive(minimum: 220), spacing: 14)
+                    ],
+                    spacing: 14
+                ) {
+                    labeledTextField(
+                        title: "Base",
+                        placeholder: "e.g. LAX",
+                        text: $viewModel.filters.selectedBase
+                    )
+
+                    labeledTextField(
+                        title: "Position",
+                        placeholder: "e.g. A",
+                        text: $viewModel.filters.selectedPosition
+                    )
+                }
             }
         }
     }
-    
-    private func recoveryMinutesRow(
-        title: String,
-        restMinutes: Binding<Int?>,
-        triggerMinutes: Binding<Int?>,
-        triggerLabel: String
-    ) -> some View {
+
+    private var dailyBlockFilterRow: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
+            filterLabel(
+                "Daily Block",
+                glossaryTerm: "Daily Block Filter"
+            )
 
             HStack(spacing: 12) {
-                Text("Rest ≤")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                optionalHoursField(minutes: restMinutes)
-                    .frame(width: 80)
-
-                Text("hh")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                optionalMinutesRemainderField(minutes: restMinutes)
-                    .frame(width: 80)
-
-                Text("mm")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Text(triggerLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 14)
-
-                optionalHoursField(minutes: triggerMinutes)
-                    .frame(width: 80)
-
-                Text("hh")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                optionalMinutesRemainderField(minutes: triggerMinutes)
-                    .frame(width: 80)
-
-                Text("mm")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-            }
-        }
-    }
-
-    private func recoveryIntRow(
-        title: String,
-        restMinutes: Binding<Int?>,
-        triggerValue: Binding<Int?>,
-        triggerLabel: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-
-            HStack(spacing: 12) {
-                Text("Rest ≤")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                optionalHoursField(minutes: restMinutes)
-                    .frame(width: 80)
-
-                Text("hh")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                optionalMinutesRemainderField(minutes: restMinutes)
-                    .frame(width: 80)
-
-                Text("mm")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Text(triggerLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 14)
+                Text("At least")
 
                 optionalIntField(
-                    placeholder: "#",
-                    value: triggerValue
+                    placeholder: "Days",
+                    value: $viewModel.filters.blockDaysRequired
                 )
                 .frame(width: 90)
 
+                Text("days")
+
+                Picker(
+                    "Daily Block Comparison",
+                    selection: $viewModel.filters.blockDaysMode
+                ) {
+                    ForEach(DailyBlockComparisonMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 100)
+
+                optionalHoursField(
+                    minutes: $viewModel.filters.blockDaysThresholdMinutes
+                )
+                .frame(width: 80)
+
+                Text("hh")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                optionalMinutesRemainderField(
+                    minutes: $viewModel.filters.blockDaysThresholdMinutes
+                )
+                .frame(width: 80)
+
+                Text("mm block")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Spacer()
             }
         }
     }
-    
-    
-    
-    private var operationsSection: some View {
-        filterGroup(title: "Operations") {
-            LazyVGrid(
-                columns: [
-                    GridItem(.adaptive(minimum: 150), spacing: 10)
-                ],
-                spacing: 10
-            ) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Redeye")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
 
-                    Picker("Redeye", selection: $viewModel.filters.redeyeFilterMode) {
-                        ForEach(RedeyeFilterMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-                toggleChip("Day Layover", isOn: $viewModel.filters.dayLayoverOnly)
-                toggleChip("Cross-town", isOn: $viewModel.filters.crossTownOnly)
-                toggleChip("Starts DH", isOn: $viewModel.filters.startsDeadheadOnly)
-                toggleChip("Ends DH", isOn: $viewModel.filters.endsDeadheadOnly)
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Circadian swaps")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 10) {
-                    Picker("Circadian swaps", selection: $viewModel.filters.circadianSwapMode) {
-                        ForEach(CircadianSwapFilterMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.menu)
-
-                    Picker("Mitigation", selection: $viewModel.filters.circadianMitigationMode) {
-                        ForEach(CircadianMitigationFilterMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-            }
-        }
-    }
-
-    private var commutabilitySection: some View {
-        filterGroup(title: "Commutability") {
-            LazyVGrid(
-                columns: [
-                    GridItem(.adaptive(minimum: 170), spacing: 10)
-                ],
-                spacing: 10
-            ) {
-                toggleChip("Commute In", isOn: $viewModel.filters.commuteInOnly)
-                toggleChip("Commute Home", isOn: $viewModel.filters.commuteHomeOnly)
-                toggleChip("Fully Commutable", isOn: $viewModel.filters.fullyCommutableOnly)
-            }
-        }
-    }
+    // MARK: - Stations
 
     private var stationSection: some View {
         filterGroup(title: "Stations") {
@@ -342,15 +280,18 @@ struct FilterPanelView: View {
 
                 labeledTextField(
                     title: "Touches Station",
+                    glossaryTerm: "Touches Station",
                     placeholder: "e.g. ATL",
                     text: $viewModel.filters.touchesStationText
                 )
-                
+
                 VStack(alignment: .leading, spacing: 8) {
-                    
-                    Text("Regions")
-                        .font(.headline)
-                        
+                    filterLabel(
+                        "Regions",
+                        glossaryTerm: "Region",
+                        font: .headline,
+                        secondary: false
+                    )
 
                     Menu {
                         ForEach(availableRegions, id: \.self) { region in
@@ -375,7 +316,11 @@ struct FilterPanelView: View {
                     } label: {
                         HStack {
                             Text(regionMenuTitle)
-                                .foregroundStyle(viewModel.filters.selectedRegions.isEmpty ? .secondary : .primary)
+                                .foregroundStyle(
+                                    viewModel.filters.selectedRegions.isEmpty
+                                        ? .secondary
+                                        : .primary
+                                )
 
                             Spacer()
 
@@ -392,15 +337,7 @@ struct FilterPanelView: View {
             }
         }
     }
-    
-    private func toggleRegion(_ region: String) {
-        if viewModel.filters.selectedRegions.contains(region) {
-            viewModel.filters.selectedRegions.remove(region)
-        } else {
-            viewModel.filters.selectedRegions.insert(region)
-        }
-    }
-    
+
     private var regionMenuTitle: String {
         if viewModel.filters.selectedRegions.isEmpty {
             return "Any region"
@@ -415,258 +352,50 @@ struct FilterPanelView: View {
         return "\(selected.count) regions selected"
     }
 
-
-    private var tripSection: some View {
-        filterGroup(title: "Trip") {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(spacing: 10) {
-                    dayChip(1, title: "1 Day")
-                    dayChip(2, title: "2 Day")
-                    dayChip(3, title: "3 Day")
-                    dayChip(4, title: "4 Day")
-                    dayChip(5, title: "5+ Day")
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Start Day")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    HStack(spacing: 10) {
-                        startDayChip("Mon")
-                        startDayChip("Tue")
-                        startDayChip("Wed")
-                        startDayChip("Thu")
-                        startDayChip("Fri")
-                        startDayChip("Sat")
-                        startDayChip("Sun")
-                    }
-                }
-                
-                
-
-                Picker("Weekend Touch", selection: $viewModel.filters.weekendTouchMode) {
-                    ForEach(WeekendTouchFilterMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                comparisonIntRow(
-                    title: "Duty Periods",
-                    mode: $viewModel.filters.dutyPeriodsMode,
-                    value: $viewModel.filters.dutyPeriodsValue,
-                    placeholder: "#"
-                )
-
-                comparisonIntRow(
-                    title: "Max Legs",
-                    mode: $viewModel.filters.maxLegsMode,
-                    value: $viewModel.filters.maxLegsValue,
-                    placeholder: "#"
-                )
-                
-
-                comparisonIntRow(
-                    title: "Frequency",
-                    mode: $viewModel.filters.frequencyMode,
-                    value: $viewModel.filters.frequencyValue,
-                    placeholder: "#"
-                )
-                
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Leg-heavy Days")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    HStack(spacing: 12) {
-                        Text("At least")
-
-                        optionalIntField(
-                            placeholder: "Days",
-                            value: $viewModel.filters.daysWithLegsDaysValue
-                        )
-                        .frame(width: 90)
-
-                        Text("days with")
-
-                        optionalIntField(
-                            placeholder: "Legs",
-                            value: $viewModel.filters.daysWithLegsLegsValue
-                        )
-                        .frame(width: 90)
-
-                        Text("or more legs")
-
-                        Spacer()
-                    }
-                }
-                
-                comparisonMinutesRangeRow(
-                    title: "Check-in",
-                    mode: $viewModel.filters.checkInMode,
-                    startMinutes: $viewModel.filters.checkInMinutes,
-                    endMinutes: $viewModel.filters.checkInEndMinutes
-                )
-
-                comparisonMinutesRangeRow(
-                    title: "Release",
-                    mode: $viewModel.filters.releaseMode,
-                    startMinutes: $viewModel.filters.releaseMinutes,
-                    endMinutes: $viewModel.filters.releaseEndMinutes
-                )
-                
-                LazyVGrid(
-                    columns: [
-                        GridItem(.adaptive(minimum: 220), spacing: 14)
-                    ],
-                    spacing: 14
-                ) {
-                    labeledTextField(
-                        title: "Base",
-                        placeholder: "e.g. LAX",
-                        text: $viewModel.filters.selectedBase
-                    )
-
-                    labeledTextField(
-                        title: "Position",
-                        placeholder: "e.g. A",
-                        text: $viewModel.filters.selectedPosition
-                    )
-                }
-            }
-        }
-    }
-    
-    private func comparisonMinutesRangeRow(
-        title: String,
-        mode: Binding<ComparisonFilterMode>,
-        startMinutes: Binding<Int?>,
-        endMinutes: Binding<Int?>
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .frame(width: 150, alignment: .leading)
-
-                Picker(title, selection: mode) {
-                    ForEach(ComparisonFilterMode.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(width: 150)
-
-                optionalHoursField(minutes: startMinutes)
-                    .frame(width: 80)
-
-                Text("hh")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                optionalMinutesRemainderField(minutes: startMinutes)
-                    .frame(width: 80)
-
-                Text("mm")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                if mode.wrappedValue == .between {
-                    Text("and")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, 8)
-
-                    optionalHoursField(minutes: endMinutes)
-                        .frame(width: 80)
-
-                    Text("hh")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    optionalMinutesRemainderField(minutes: endMinutes)
-                        .frame(width: 80)
-
-                    Text("mm")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-            }
+    private func toggleRegion(_ region: String) {
+        if viewModel.filters.selectedRegions.contains(region) {
+            viewModel.filters.selectedRegions.remove(region)
+        } else {
+            viewModel.filters.selectedRegions.insert(region)
         }
     }
 
-    private func startDayChip(_ day: String) -> some View {
-        let selected = viewModel.filters.selectedStartDays.contains(day)
+    // MARK: - Credit / Time
 
-        return Button {
-            if selected {
-                viewModel.filters.selectedStartDays.remove(day)
-            } else {
-                viewModel.filters.selectedStartDays.insert(day)
-            }
-        } label: {
-            Text(day)
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(selected ? .blue : Color(.systemBackground))
-                .foregroundStyle(selected ? .white : .primary)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-    
-    private func regionChip(_ region: String) -> some View {
-        let selected = viewModel.filters.selectedRegions.contains(region)
-
-        return Button {
-            if selected {
-                viewModel.filters.selectedRegions.remove(region)
-            } else {
-                viewModel.filters.selectedRegions.insert(region)
-            }
-        } label: {
-            Text(region)
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(selected ? .blue : Color(.systemBackground))
-                .foregroundStyle(selected ? .white : .primary)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-    
     private var creditSection: some View {
         filterGroup(title: "Credit / Time") {
             VStack(alignment: .leading, spacing: 18) {
                 comparisonMinutesRow(
                     title: "Total Credit",
+                    glossaryTerm: "Total Credit",
                     mode: $viewModel.filters.totalCreditMode,
                     minutes: $viewModel.filters.totalCreditMinutes
                 )
 
                 comparisonMinutesRow(
                     title: "Credit Per Day",
+                    glossaryTerm: "Credit Per Day",
                     mode: $viewModel.filters.creditPerDayMode,
                     minutes: $viewModel.filters.creditPerDayMinutes
                 )
 
                 comparisonMinutesRow(
                     title: "Non-block Credit",
+                    glossaryTerm: "Non-block Credit",
                     mode: $viewModel.filters.nonBlockCreditMode,
                     minutes: $viewModel.filters.nonBlockCreditMinutes
                 )
 
                 comparisonMinutesRow(
                     title: "TAFB",
+                    glossaryTerm: "TAFB",
                     mode: $viewModel.filters.tafbMode,
                     minutes: $viewModel.filters.tafbMinutes
                 )
+
                 comparisonDoubleRow(
                     title: "Duty Efficiency",
+                    glossaryTerm: "Duty Efficiency",
                     mode: $viewModel.filters.dutyEfficiencyMode,
                     value: $viewModel.filters.dutyEfficiencyValue,
                     placeholder: "0.85"
@@ -674,106 +403,193 @@ struct FilterPanelView: View {
 
                 comparisonMinutesRow(
                     title: "Longest FDP",
+                    glossaryTerm: "Longest FDP",
                     mode: $viewModel.filters.longestFDPMode,
                     minutes: $viewModel.filters.longestFDPMinutes
                 )
-                
+
                 plainMinutesRow(
                     title: "Longest Sit ≥",
+                    glossaryTerm: "Sit",
                     minutes: $viewModel.filters.longestSitMinutes
                 )
 
                 rangeMinutesRow(
                     title: "Layover Length",
+                    glossaryTerm: "Layover Length",
                     minMinutes: $viewModel.filters.layoverLengthMinMinutes,
                     maxMinutes: $viewModel.filters.layoverLengthMaxMinutes
                 )
             }
         }
     }
-    
-    private func plainMinutesRow(
-        title: String,
-        minutes: Binding<Int?>
-    ) -> some View {
-        HStack(spacing: 12) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .frame(width: 150, alignment: .leading)
 
-            optionalHoursField(minutes: minutes)
-                .frame(width: 80)
+    // MARK: - Recovery
 
-            Text("hh")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private var recoverySection: some View {
+        filterGroup(title: "Recovery") {
+            VStack(alignment: .leading, spacing: 18) {
+                recoveryMinutesRow(
+                    title: "FDP Recovery",
+                    glossaryTerm: "FDP Recovery",
+                    restMinutes: $viewModel.filters.fdpRecoveryRestMinutes,
+                    triggerMinutes: $viewModel.filters.fdpRecoveryFDPMinutes,
+                    triggerLabel: "after FDP ≥"
+                )
 
-            optionalMinutesRemainderField(minutes: minutes)
-                .frame(width: 80)
+                recoveryIntRow(
+                    title: "Legs Recovery",
+                    glossaryTerm: "Legs Recovery",
+                    restMinutes: $viewModel.filters.legsRecoveryRestMinutes,
+                    triggerValue: $viewModel.filters.legsRecoveryLegsBefore,
+                    triggerLabel: "after legs ≥"
+                )
 
-            Text("mm")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Spacer()
-        }
-    }
-
-    private func rangeMinutesRow(
-        title: String,
-        minMinutes: Binding<Int?>,
-        maxMinutes: Binding<Int?>
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-
-            HStack(spacing: 12) {
-                Text("Min")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                optionalHoursField(minutes: minMinutes)
-                    .frame(width: 80)
-
-                Text("hh")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                optionalMinutesRemainderField(minutes: minMinutes)
-                    .frame(width: 80)
-
-                Text("mm")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Text("Max")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 14)
-
-                optionalHoursField(minutes: maxMinutes)
-                    .frame(width: 80)
-
-                Text("hh")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                optionalMinutesRemainderField(minutes: maxMinutes)
-                    .frame(width: 80)
-
-                Text("mm")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
+                recoveryMinutesRow(
+                    title: "Block Recovery",
+                    glossaryTerm: "Block Recovery",
+                    restMinutes: $viewModel.filters.blockRecoveryRestMinutes,
+                    triggerMinutes: $viewModel.filters.blockRecoveryBlockMinutes,
+                    triggerLabel: "after block ≥"
+                )
             }
         }
     }
+
+    // MARK: - Operations
+
+    private var operationsSection: some View {
+        filterGroup(title: "Operations") {
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 8) {
+                    filterLabel(
+                        "Red-eye",
+                        glossaryTerm: "Red-eye"
+                    )
+
+                    Picker(
+                        "Red-eye",
+                        selection: $viewModel.filters.redeyeFilterMode
+                    ) {
+                        ForEach(RedeyeFilterMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(.adaptive(minimum: 150), spacing: 10)
+                    ],
+                    spacing: 10
+                ) {
+                    toggleChip(
+                        "Day Layover",
+                        glossaryTerm: "Day Layover",
+                        isOn: $viewModel.filters.dayLayoverOnly
+                    )
+
+                    toggleChip(
+                        "Cross-town",
+                        glossaryTerm: "Cross-town Layover",
+                        isOn: $viewModel.filters.crossTownOnly
+                    )
+
+                    toggleChip(
+                        "Starts DH",
+                        glossaryTerm: "Front Deadhead",
+                        isOn: $viewModel.filters.startsDeadheadOnly
+                    )
+
+                    toggleChip(
+                        "Ends DH",
+                        glossaryTerm: "Back Deadhead",
+                        isOn: $viewModel.filters.endsDeadheadOnly
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    filterLabel(
+                        "Circadian Swaps",
+                        glossaryTerm: "Circadian Swap"
+                    )
+
+                    HStack(spacing: 10) {
+                        Picker(
+                            "Circadian Swaps",
+                            selection: $viewModel.filters.circadianSwapMode
+                        ) {
+                            ForEach(CircadianSwapFilterMode.allCases) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        HStack(spacing: 6) {
+                            Picker(
+                                "Mitigation",
+                                selection: $viewModel.filters.circadianMitigationMode
+                            ) {
+                                ForEach(CircadianMitigationFilterMode.allCases) { mode in
+                                    Text(mode.title).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.menu)
+
+                            GlossaryInfoButton(
+                                term: "Mitigated Circadian Swap"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Commutability
+
+    private var commutabilitySection: some View {
+        filterGroup(title: "Commutability") {
+            LazyVGrid(
+                columns: [
+                    GridItem(.adaptive(minimum: 170), spacing: 10)
+                ],
+                spacing: 10
+            ) {
+                toggleChip(
+                    "Commute In",
+                    glossaryTerm: "Commute In",
+                    isOn: $viewModel.filters.commuteInOnly
+                )
+
+                toggleChip(
+                    "Commute Home",
+                    glossaryTerm: "Commute Home",
+                    isOn: $viewModel.filters.commuteHomeOnly
+                )
+
+                toggleChip(
+                    "Fully Commutable",
+                    glossaryTerm: "Fully Commutable",
+                    isOn: $viewModel.filters.fullyCommutableOnly
+                )
+            }
+        }
+    }
+
+    // MARK: - Dates
+
     private var datesSection: some View {
-        filterGroup(title: "Touches Dates") {
+        filterGroup(
+            title: "Touches Dates",
+            glossaryTerm: "Touches Dates"
+        ) {
             VStack(alignment: .leading, spacing: 14) {
-                Picker("Date Mode", selection: $viewModel.filters.touchDateMode) {
+                Picker(
+                    "Date Mode",
+                    selection: $viewModel.filters.touchDateMode
+                ) {
                     ForEach(TouchDateFilterMode.allCases) { mode in
                         Text(mode.title).tag(mode)
                     }
@@ -781,48 +597,106 @@ struct FilterPanelView: View {
                 .pickerStyle(.segmented)
                 .frame(width: 260)
 
-                TextField(
-                    "YYYY-MM-DD, YYYY-MM-DD",
-                    text: Binding(
-                        get: {
-                            viewModel.filters.touchDateStrings
-                                .sorted()
-                                .joined(separator: ", ")
-                        },
-                        set: { newValue in
-                            let dates = newValue
-                                .split(separator: ",")
-                                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                                .filter { !$0.isEmpty }
+                HStack {
+                    Spacer()
 
-                            viewModel.filters.touchDateStrings = Set(dates)
-                        }
+                    BidpacketMultiDateCalendar(
+                        selectedDates: $selectedDateComponents,
+                        initialVisibleMonth: viewModel.bidpacketMonthComponents
                     )
-                )
-                .textFieldStyle(.roundedBorder)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
+                    .frame(width: 430, height: 360)
+                    .clipped()
 
-                Text("Enter one or more dates separated by commas.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Spacer()
+                }
 
-                if !viewModel.filters.touchDateStrings.isEmpty {
-                    Text("\(viewModel.filters.touchDateStrings.count) dates selected")
+                HStack {
+                    if selectedDateComponents.isEmpty {
+                        Text("Select one or more dates.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(
+                            "\(selectedDateComponents.count) " +
+                            (selectedDateComponents.count == 1
+                                ? "date selected"
+                                : "dates selected")
+                        )
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    if !selectedDateComponents.isEmpty {
+                        Button("Clear Dates", role: .destructive) {
+                            selectedDateComponents.removeAll()
+                            viewModel.filters.touchDateStrings.removeAll()
+                        }
+                        .font(.caption.weight(.semibold))
+                    }
                 }
+            }
+            .onChange(of: selectedDateComponents) { _, newDates in
+                viewModel.filters.touchDateStrings = Set(
+                    newDates.compactMap { dateString(from: $0) }
+                )
             }
         }
     }
-    
+
+    // MARK: - Extra Pay
+
+    private var extraPaySection: some View {
+        filterGroup(title: "Extra Pay") {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ],
+                spacing: 14
+            ) {
+                minimumPayField(
+                    title: "SIT ≥",
+                    glossaryTerm: "SIT",
+                    value: $viewModel.filters.sitPayMinimum
+                )
+
+                minimumPayField(
+                    title: "EDP ≥",
+                    glossaryTerm: "EDP",
+                    value: $viewModel.filters.edpPayMinimum
+                )
+
+                minimumPayField(
+                    title: "HOL ≥",
+                    glossaryTerm: "HOL",
+                    value: $viewModel.filters.holPayMinimum
+                )
+
+                minimumPayField(
+                    title: "CARVE ≥",
+                    glossaryTerm: "CARVE",
+                    value: $viewModel.filters.carvePayMinimum
+                )
+            }
+        }
+    }
+
+    // MARK: - Reusable Rows
+
     private func filterGroup<Content: View>(
         title: String,
+        glossaryTerm: String? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
+            filterLabel(
+                title,
+                glossaryTerm: glossaryTerm,
+                font: .headline,
+                secondary: false
+            )
 
             content()
         }
@@ -832,78 +706,41 @@ struct FilterPanelView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
-    private func labeledTextField(
-        title: String,
-        placeholder: String,
-        text: Binding<String>
+    private func filterLabel(
+        _ title: String,
+        glossaryTerm: String? = nil,
+        font: Font = .caption,
+        secondary: Bool = true
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        HStack(spacing: 6) {
             Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(font)
+                .foregroundStyle(secondary ? .secondary : .primary)
 
-            TextField(placeholder, text: text)
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-                .textFieldStyle(.roundedBorder)
-        }
-    }
-    
-    private func comparisonDoubleRow(
-        title: String,
-        mode: Binding<ComparisonFilterMode>,
-        value: Binding<Double?>,
-        placeholder: String
-    ) -> some View {
-        HStack(spacing: 12) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .frame(width: 150, alignment: .leading)
-
-            Picker(title, selection: mode) {
-                ForEach(ComparisonFilterMode.allCases) { option in
-                    Text(option.title).tag(option)
-                }
+            if let glossaryTerm {
+                GlossaryInfoButton(term: glossaryTerm)
             }
-            .pickerStyle(.menu)
-            .frame(width: 150)
-
-            TextField(
-                placeholder,
-                text: Binding(
-                    get: {
-                        if let wrapped = value.wrappedValue {
-                            return String(format: "%.3f", wrapped)
-                        }
-
-                        return ""
-                    },
-                    set: { newValue in
-                        value.wrappedValue = Double(newValue)
-                    }
-                )
-            )
-            .keyboardType(.decimalPad)
-            .textFieldStyle(.roundedBorder)
-            .frame(width: 100)
-
-            Spacer()
         }
     }
 
     private func comparisonIntRow(
         title: String,
+        glossaryTerm: String? = nil,
         mode: Binding<ComparisonFilterMode>,
         value: Binding<Int?>,
         placeholder: String
     ) -> some View {
         HStack(spacing: 12) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .frame(width: 150, alignment: .leading)
+            filterLabel(
+                title,
+                glossaryTerm: glossaryTerm,
+                font: .subheadline.weight(.semibold),
+                secondary: false
+            )
+            .frame(width: 150, alignment: .leading)
 
             Picker(title, selection: mode) {
-                ForEach(ComparisonFilterMode.allCases) { option in
+                ForEach(standardComparisonModes) { option in
                     Text(option.title).tag(option)
                 }
             }
@@ -920,18 +757,70 @@ struct FilterPanelView: View {
         }
     }
 
+    private func comparisonDoubleRow(
+        title: String,
+        glossaryTerm: String? = nil,
+        mode: Binding<ComparisonFilterMode>,
+        value: Binding<Double?>,
+        placeholder: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            filterLabel(
+                title,
+                glossaryTerm: glossaryTerm,
+                font: .subheadline.weight(.semibold),
+                secondary: false
+            )
+            .frame(width: 150, alignment: .leading)
+
+            Picker(title, selection: mode) {
+                ForEach(standardComparisonModes) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 150)
+
+            TextField(
+                placeholder,
+                text: Binding(
+                    get: {
+                        guard let wrapped = value.wrappedValue else {
+                            return ""
+                        }
+
+                        return String(format: "%.3f", wrapped)
+                    },
+                    set: { newValue in
+                        value.wrappedValue = Double(newValue)
+                    }
+                )
+            )
+            .keyboardType(.decimalPad)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 100)
+
+            Spacer()
+        }
+    }
+
     private func comparisonMinutesRow(
         title: String,
+        glossaryTerm: String? = nil,
         mode: Binding<ComparisonFilterMode>,
         minutes: Binding<Int?>
     ) -> some View {
         HStack(spacing: 12) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .frame(width: 150, alignment: .leading)
+            filterLabel(
+                title,
+                glossaryTerm: glossaryTerm,
+                font: .subheadline.weight(.semibold),
+                secondary: false
+            )
+            .frame(width: 150, alignment: .leading)
 
             Picker(title, selection: mode) {
-                ForEach(ComparisonFilterMode.allCases) { option in
+                ForEach(standardComparisonModes) { option in
                     Text(option.title).tag(option)
                 }
             }
@@ -941,19 +830,337 @@ struct FilterPanelView: View {
             optionalHoursField(minutes: minutes)
                 .frame(width: 80)
 
-            Text("hh")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            timeUnitLabel("hh")
 
             optionalMinutesRemainderField(minutes: minutes)
                 .frame(width: 80)
 
-            Text("mm")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            timeUnitLabel("mm")
 
             Spacer()
         }
+    }
+
+    private func comparisonMinutesRangeRow(
+        title: String,
+        glossaryTerm: String? = nil,
+        mode: Binding<ComparisonFilterMode>,
+        startMinutes: Binding<Int?>,
+        endMinutes: Binding<Int?>
+    ) -> some View {
+        HStack(spacing: 12) {
+            filterLabel(
+                title,
+                glossaryTerm: glossaryTerm,
+                font: .subheadline.weight(.semibold),
+                secondary: false
+            )
+            .frame(width: 150, alignment: .leading)
+
+            Picker(title, selection: mode) {
+                ForEach(ComparisonFilterMode.allCases) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 150)
+
+            optionalHoursField(minutes: startMinutes)
+                .frame(width: 80)
+
+            timeUnitLabel("hh")
+
+            optionalMinutesRemainderField(minutes: startMinutes)
+                .frame(width: 80)
+
+            timeUnitLabel("mm")
+
+            if mode.wrappedValue == .between {
+                Text("and")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 8)
+
+                optionalHoursField(minutes: endMinutes)
+                    .frame(width: 80)
+
+                timeUnitLabel("hh")
+
+                optionalMinutesRemainderField(minutes: endMinutes)
+                    .frame(width: 80)
+
+                timeUnitLabel("mm")
+            }
+
+            Spacer()
+        }
+    }
+
+    private func plainMinutesRow(
+        title: String,
+        glossaryTerm: String? = nil,
+        minutes: Binding<Int?>
+    ) -> some View {
+        HStack(spacing: 12) {
+            filterLabel(
+                title,
+                glossaryTerm: glossaryTerm,
+                font: .subheadline.weight(.semibold),
+                secondary: false
+            )
+            .frame(width: 150, alignment: .leading)
+
+            optionalHoursField(minutes: minutes)
+                .frame(width: 80)
+
+            timeUnitLabel("hh")
+
+            optionalMinutesRemainderField(minutes: minutes)
+                .frame(width: 80)
+
+            timeUnitLabel("mm")
+
+            Spacer()
+        }
+    }
+
+    private func rangeMinutesRow(
+        title: String,
+        glossaryTerm: String? = nil,
+        minMinutes: Binding<Int?>,
+        maxMinutes: Binding<Int?>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            filterLabel(
+                title,
+                glossaryTerm: glossaryTerm,
+                font: .subheadline.weight(.semibold),
+                secondary: false
+            )
+
+            HStack(spacing: 12) {
+                Text("Min")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                optionalHoursField(minutes: minMinutes)
+                    .frame(width: 80)
+
+                timeUnitLabel("hh")
+
+                optionalMinutesRemainderField(minutes: minMinutes)
+                    .frame(width: 80)
+
+                timeUnitLabel("mm")
+
+                Text("Max")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 14)
+
+                optionalHoursField(minutes: maxMinutes)
+                    .frame(width: 80)
+
+                timeUnitLabel("hh")
+
+                optionalMinutesRemainderField(minutes: maxMinutes)
+                    .frame(width: 80)
+
+                timeUnitLabel("mm")
+
+                Spacer()
+            }
+        }
+    }
+
+    private func recoveryMinutesRow(
+        title: String,
+        glossaryTerm: String? = nil,
+        restMinutes: Binding<Int?>,
+        triggerMinutes: Binding<Int?>,
+        triggerLabel: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            filterLabel(
+                title,
+                glossaryTerm: glossaryTerm,
+                font: .subheadline.weight(.semibold),
+                secondary: false
+            )
+
+            HStack(spacing: 12) {
+                Text("Rest ≤")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                optionalHoursField(minutes: restMinutes)
+                    .frame(width: 80)
+
+                timeUnitLabel("hh")
+
+                optionalMinutesRemainderField(minutes: restMinutes)
+                    .frame(width: 80)
+
+                timeUnitLabel("mm")
+
+                Text(triggerLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 14)
+
+                optionalHoursField(minutes: triggerMinutes)
+                    .frame(width: 80)
+
+                timeUnitLabel("hh")
+
+                optionalMinutesRemainderField(minutes: triggerMinutes)
+                    .frame(width: 80)
+
+                timeUnitLabel("mm")
+
+                Spacer()
+            }
+        }
+    }
+
+    private func recoveryIntRow(
+        title: String,
+        glossaryTerm: String? = nil,
+        restMinutes: Binding<Int?>,
+        triggerValue: Binding<Int?>,
+        triggerLabel: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            filterLabel(
+                title,
+                glossaryTerm: glossaryTerm,
+                font: .subheadline.weight(.semibold),
+                secondary: false
+            )
+
+            HStack(spacing: 12) {
+                Text("Rest ≤")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                optionalHoursField(minutes: restMinutes)
+                    .frame(width: 80)
+
+                timeUnitLabel("hh")
+
+                optionalMinutesRemainderField(minutes: restMinutes)
+                    .frame(width: 80)
+
+                timeUnitLabel("mm")
+
+                Text(triggerLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 14)
+
+                optionalIntField(
+                    placeholder: "#",
+                    value: triggerValue
+                )
+                .frame(width: 90)
+
+                Spacer()
+            }
+        }
+    }
+
+    private func labeledTextField(
+        title: String,
+        glossaryTerm: String? = nil,
+        placeholder: String,
+        text: Binding<String>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            filterLabel(title, glossaryTerm: glossaryTerm)
+
+            TextField(placeholder, text: text)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .textFieldStyle(.roundedBorder)
+        }
+    }
+
+    private func minimumPayField(
+        title: String,
+        glossaryTerm: String? = nil,
+        value: Binding<Double?>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            filterLabel(title, glossaryTerm: glossaryTerm)
+
+            TextField(
+                "Minimum",
+                text: Binding(
+                    get: {
+                        guard let wrapped = value.wrappedValue else {
+                            return ""
+                        }
+
+                        return String(format: "%.1f", wrapped)
+                    },
+                    set: { newValue in
+                        value.wrappedValue = Double(newValue)
+                    }
+                )
+            )
+            .keyboardType(.decimalPad)
+            .textFieldStyle(.roundedBorder)
+        }
+    }
+
+    private func toggleChip(
+        _ title: String,
+        glossaryTerm: String? = nil,
+        isOn: Binding<Bool>
+    ) -> some View {
+        HStack(spacing: 8) {
+            Button {
+                isOn.wrappedValue.toggle()
+            } label: {
+                HStack {
+                    Image(
+                        systemName: isOn.wrappedValue
+                            ? "checkmark.circle.fill"
+                            : "circle"
+                    )
+
+                    Text(title)
+                        .fontWeight(.semibold)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    isOn.wrappedValue
+                        ? .blue.opacity(0.16)
+                        : Color(.systemBackground)
+                )
+                .foregroundStyle(isOn.wrappedValue ? .blue : .primary)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+
+            if let glossaryTerm {
+                GlossaryInfoButton(term: glossaryTerm)
+            }
+        }
+    }
+
+    // MARK: - Inputs
+
+    private var standardComparisonModes: [ComparisonFilterMode] {
+        [
+            .all,
+            .greaterThanOrEqual,
+            .lessThanOrEqual,
+            .equalTo
+        ]
     }
 
     private func optionalIntField(
@@ -964,11 +1171,11 @@ struct FilterPanelView: View {
             placeholder,
             text: Binding(
                 get: {
-                    if let wrapped = value.wrappedValue {
-                        return "\(wrapped)"
+                    guard let wrapped = value.wrappedValue else {
+                        return ""
                     }
 
-                    return ""
+                    return "\(wrapped)"
                 },
                 set: { newValue in
                     value.wrappedValue = Int(newValue)
@@ -993,9 +1200,18 @@ struct FilterPanelView: View {
                     return "\(total / 60)"
                 },
                 set: { newValue in
-                    let hours = Int(newValue) ?? 0
-                    let currentRemainder = (minutes.wrappedValue ?? 0) % 60
-                    minutes.wrappedValue = hours * 60 + currentRemainder
+                    guard !newValue.isEmpty else {
+                        let remainder = (minutes.wrappedValue ?? 0) % 60
+                        minutes.wrappedValue = remainder == 0 ? nil : remainder
+                        return
+                    }
+
+                    guard let hours = Int(newValue), hours >= 0 else {
+                        return
+                    }
+
+                    let remainder = (minutes.wrappedValue ?? 0) % 60
+                    minutes.wrappedValue = hours * 60 + remainder
                 }
             )
         )
@@ -1017,9 +1233,19 @@ struct FilterPanelView: View {
                     return "\(total % 60)"
                 },
                 set: { newValue in
-                    let remainder = Int(newValue) ?? 0
-                    let currentHours = (minutes.wrappedValue ?? 0) / 60
-                    minutes.wrappedValue = currentHours * 60 + remainder
+                    guard !newValue.isEmpty else {
+                        let hours = (minutes.wrappedValue ?? 0) / 60
+                        minutes.wrappedValue = hours == 0 ? nil : hours * 60
+                        return
+                    }
+
+                    guard let remainder = Int(newValue),
+                          (0...59).contains(remainder) else {
+                        return
+                    }
+
+                    let hours = (minutes.wrappedValue ?? 0) / 60
+                    minutes.wrappedValue = hours * 60 + remainder
                 }
             )
         )
@@ -1027,29 +1253,39 @@ struct FilterPanelView: View {
         .textFieldStyle(.roundedBorder)
     }
 
-    private func toggleChip(
-        _ title: String,
-        isOn: Binding<Bool>
-    ) -> some View {
-        Button {
-            isOn.wrappedValue.toggle()
-        } label: {
-            HStack {
-                Image(systemName: isOn.wrappedValue ? "checkmark.circle.fill" : "circle")
-                Text(title)
-                    .fontWeight(.semibold)
-                Spacer()
+    private func timeUnitLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    // MARK: - Selection Chips
+
+    private func startDayChip(_ day: String) -> some View {
+        let selected = viewModel.filters.selectedStartDays.contains(day)
+
+        return Button {
+            if selected {
+                viewModel.filters.selectedStartDays.remove(day)
+            } else {
+                viewModel.filters.selectedStartDays.insert(day)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(isOn.wrappedValue ? .blue.opacity(0.16) : Color(.systemBackground))
-            .foregroundStyle(isOn.wrappedValue ? .blue : .primary)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+        } label: {
+            Text(day)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(selected ? .blue : Color(.systemBackground))
+                .foregroundStyle(selected ? .white : .primary)
+                .clipShape(Capsule())
         }
         .buttonStyle(.plain)
     }
 
-    private func dayChip(_ days: Int, title: String) -> some View {
+    private func dayChip(
+        _ days: Int,
+        title: String
+    ) -> some View {
         let selected = isDayLengthSelected(days)
 
         return Button {
@@ -1097,20 +1333,31 @@ struct FilterPanelView: View {
         return viewModel.filters.selectedDayLengths.contains(days)
     }
 
-    private func dateString(from components: DateComponents) -> String? {
+    // MARK: - Dates
+
+    private func dateString(
+        from components: DateComponents
+    ) -> String? {
         guard let year = components.year,
               let month = components.month,
               let day = components.day else {
             return nil
         }
 
-        return String(format: "%04d-%02d-%02d", year, month, day)
+        return String(
+            format: "%04d-%02d-%02d",
+            year,
+            month,
+            day
+        )
     }
 
     private func dateComponentsFromFilterStrings() -> Set<DateComponents> {
         Set(
             viewModel.filters.touchDateStrings.compactMap { string in
-                let parts = string.split(separator: "-").compactMap { Int($0) }
+                let parts = string
+                    .split(separator: "-")
+                    .compactMap { Int($0) }
 
                 guard parts.count == 3 else {
                     return nil
@@ -1126,8 +1373,6 @@ struct FilterPanelView: View {
         )
     }
 }
-
-
 
 #Preview {
     FilterPanelView(viewModel: BidpacketViewModel())

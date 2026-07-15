@@ -125,7 +125,22 @@ enum BooleanChoiceFilterMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum DailyBlockComparisonMode: String, CaseIterable, Identifiable {
+    case over
+    case under
 
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .over:
+            return "Over"
+
+        case .under:
+            return "Under"
+        }
+    }
+}
     
 
 struct RotationFilters {
@@ -185,6 +200,10 @@ struct RotationFilters {
 
     var daysWithLegsDaysValue: Int?
     var daysWithLegsLegsValue: Int?
+    
+    var blockDaysRequired: Int?
+    var blockDaysMode: DailyBlockComparisonMode = .over
+    var blockDaysThresholdMinutes: Int?
 
     // MARK: - Time Filters, Stored as Minutes
 
@@ -253,6 +272,8 @@ struct RotationFilters {
         !selectedPosition.isEmpty ||
         circadianSwapMode != .all ||
         circadianMitigationMode != .all ||
+        daysWithLegsDaysValue != nil ||
+        daysWithLegsLegsValue != nil ||
 
         sitPayMinimum != nil ||
         edpPayMinimum != nil ||
@@ -357,6 +378,10 @@ struct RotationFilters {
 
         daysWithLegsDaysValue = nil
         daysWithLegsLegsValue = nil
+        
+        blockDaysRequired = nil
+        blockDaysMode = .over
+        blockDaysThresholdMinutes = nil
 
         totalCreditMode = .all
         totalCreditMinutes = nil

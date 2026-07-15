@@ -41,6 +41,10 @@ struct DashboardView: View {
             case .downloads:
                 DownloadsWorkspaceView(viewModel: viewModel)
                 
+            case .glossary:
+                GlossaryWorkspaceView()
+
+                
             case .settings:
                 SettingsWorkspaceView()
 
@@ -57,6 +61,7 @@ private enum AppWorkspace: String, CaseIterable, Identifiable {
     case browse
     case dashboard
     case downloads
+    case glossary
     case settings
     
 
@@ -67,6 +72,7 @@ private enum AppWorkspace: String, CaseIterable, Identifiable {
         case .browse: return "Rotations"
         case .dashboard: return "Dashboard"
         case .downloads: return "Downloads"
+        case .glossary: return "Glossary"
         case .settings: return "Settings"
         
         }
@@ -77,6 +83,7 @@ private enum AppWorkspace: String, CaseIterable, Identifiable {
         case .browse: return "list.bullet.rectangle"
         case .dashboard: return "chart.bar"
         case .downloads: return "icloud.and.arrow.down"
+        case .glossary: return "book.closed"
         case .settings: return "gearshape"
         
         }

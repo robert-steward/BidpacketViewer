@@ -12,6 +12,68 @@ final class BidpacketViewModel {
         guard let bidpacketName else { return "—" }
         return String(bidpacketName.split(separator: "_").first ?? "—")
     }
+    
+    var bidpacketMonthComponents: DateComponents {
+        let fallback = Calendar.current.dateComponents(
+            [.year, .month],
+            from: Date()
+        )
+
+        guard let bidpacketName else {
+            return fallback
+        }
+
+        // Handles either:
+        // ATL_7ER_AUG2026.json
+        // 7ER_AUG2026
+        // ATL_7ER_AUG2026
+        let fileName = URL(fileURLWithPath: bidpacketName)
+            .deletingPathExtension()
+            .lastPathComponent
+            .uppercased()
+
+        let monthNumbers: [String: Int] = [
+            "JAN": 1,
+            "FEB": 2,
+            "MAR": 3,
+            "APR": 4,
+            "MAY": 5,
+            "JUN": 6,
+            "JUL": 7,
+            "AUG": 8,
+            "SEP": 9,
+            "OCT": 10,
+            "NOV": 11,
+            "DEC": 12
+        ]
+
+        let parts = fileName.split(separator: "_").map(String.init)
+
+        // Search backward so this works whether the month is after
+        // the first underscore or the second underscore.
+        for part in parts.reversed() {
+            guard part.count == 7 else {
+                continue
+            }
+
+            let monthText = String(part.prefix(3))
+            let yearText = String(part.dropFirst(3))
+
+            guard let month = monthNumbers[monthText],
+                  let year = Int(yearText) else {
+                continue
+            }
+
+            return DateComponents(
+                calendar: Calendar(identifier: .gregorian),
+                year: year,
+                month: month,
+                day: 1
+            )
+        }
+
+        return fallback
+    }
 
     private var currentSelectionKey: String?
 
@@ -60,7 +122,8 @@ final class BidpacketViewModel {
 
 
     var selectedCount: Int {
-        selectedRotationIDs.count
+        //selectedRotationIDs.count
+        selectedRotations.count
     }
 
     var selectedInstanceCount: Int {
@@ -842,13 +905,15 @@ final class BidpacketViewModel {
         }
 
         if !filters.touchDateStrings.isEmpty {
-            let effectiveDates = Set(rotation.effectiveDates ?? [])
+            let selectedDates = filters.touchDateStrings.compactMap {
+                Self.filterDateFormatter.date(from: $0)
+            }
 
-            let touchesAnySelectedDate =
-                !filters.touchDateStrings.isDisjoint(with: effectiveDates)
+            let touchesAnySelectedDate = selectedDates.contains { selectedDate in
+                rotationTouchesDate(rotation, selectedDate)
+            }
 
             switch filters.touchDateMode {
-
             case .include:
                 if !touchesAnySelectedDate {
                     return false
@@ -860,7 +925,6 @@ final class BidpacketViewModel {
                 }
             }
         }
-        
         
 
         if !passesComparison(
@@ -1035,7 +1099,11 @@ final class BidpacketViewModel {
         if !matchesDaysWithLegsFilter(rotation) {
             return false
         }
-        
+
+        if !matchesDaysWithBlockFilter(rotation) {
+            return false
+        }
+
         if !matchesCircadianSwapFilter(rotation) {
             return false
         }
@@ -1072,6 +1140,94 @@ final class BidpacketViewModel {
         case .between:
             return value >= target
         }
+    }
+    
+    private func dailyBlockMinutes(
+        for rotation: Rotation
+    ) -> [Int] {
+        /*
+         Reconstruct each duty day's block from rest_windows.
+
+         Middle duty days normally appear twice:
+         - once as block_after for the preceding rest window
+         - once as block_before for the following rest window
+
+         Keying by day code prevents those days from being counted twice.
+         */
+        var blockByDay: [String: Int] = [:]
+
+        for window in rotation.restWindows ?? [] {
+            if let fromDay = window.fromDay,
+               let blockBefore = window.blockBeforeMinutes {
+                blockByDay[fromDay] = blockBefore
+            }
+
+            if let toDay = window.toDay,
+               let blockAfter = window.blockAfterMinutes {
+                blockByDay[toDay] = blockAfter
+            }
+        }
+
+        if !blockByDay.isEmpty {
+            return blockByDay
+                .sorted { lhs, rhs in
+                    lhs.key.localizedStandardCompare(rhs.key) == .orderedAscending
+                }
+                .map(\.value)
+        }
+
+        /*
+         A one-day rotation has no rest window. Its total block is:
+
+             total credit - non-block credit
+         */
+        if rotation.numDays == 1 {
+            guard let totalCredit = rotation.totalCredit?.minutes else {
+                return []
+            }
+
+            let nonBlockCredit = rotation.nonBlockCredit?.minutes ?? 0
+            return [max(totalCredit - nonBlockCredit, 0)]
+        }
+
+        return []
+    }
+    
+    private func matchesDaysWithBlockFilter(
+        _ rotation: Rotation
+    ) -> Bool {
+        let requiredDays = filters.blockDaysRequired
+        let thresholdMinutes = filters.blockDaysThresholdMinutes
+
+        // Neither field entered: filter is inactive.
+        guard requiredDays != nil || thresholdMinutes != nil else {
+            return true
+        }
+
+        // If the user enters only half of the filter, no rotation should match.
+        guard let requiredDays,
+              let thresholdMinutes,
+              requiredDays > 0 else {
+            return false
+        }
+
+        let dailyBlocks = dailyBlockMinutes(for: rotation)
+
+        guard !dailyBlocks.isEmpty else {
+            return false
+        }
+
+        let matchingDayCount = dailyBlocks.filter { blockMinutes in
+            switch filters.blockDaysMode {
+            case .over:
+                return blockMinutes > thresholdMinutes
+
+            case .under:
+                return blockMinutes < thresholdMinutes
+            }
+        }.count
+
+        return matchingDayCount >= requiredDays
     }
     
     private func passesTimeComparison(

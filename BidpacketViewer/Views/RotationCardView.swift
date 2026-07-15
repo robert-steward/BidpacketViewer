@@ -329,22 +329,26 @@ struct RotationCardView: View {
     }
 
     private var startDateSummary: String {
-        let days = effectiveDayNumbers
+        let dates = rotation.effectiveDates ?? []
 
-        switch days.count {
+        switch dates.count {
         case 0:
             return "No dates"
+
         case 1:
-            return "Jun \(days[0])"
+            return formatDate(dates[0])
+
         case 2:
-            return "Jun \(days[0]), \(days[1])"
+            return compactDateSummary(dates)
+
         case 3:
-            return "Jun \(days[0]), \(days[1]), \(days[2])"
+            return compactDateSummary(dates)
+
         default:
-            return "\(days.count) starts"
+            return "\(dates.count) starts"
         }
     }
-
+    
     private var fullDateList: String {
         let dates = rotation.effectiveDates ?? []
 
@@ -357,13 +361,47 @@ struct RotationCardView: View {
             .joined(separator: ", ")
     }
 
-    private var effectiveDayNumbers: [Int] {
-        (rotation.effectiveDates ?? []).compactMap { dateString in
-            let parts = dateString.split(separator: "-")
-            return Int(parts.last ?? "")
-        }
-    }
+//    private var effectiveDayNumbers: [Int] {
+//        (rotation.effectiveDates ?? []).compactMap { dateString in
+//            let parts = dateString.split(separator: "-")
+//            return Int(parts.last ?? "")
+//        }
+//    }
 
+    private func compactDateSummary(_ dateStrings: [String]) -> String {
+        let parsed = dateStrings.compactMap { dateString -> (month: Int, day: Int)? in
+            let parts = dateString.split(separator: "-")
+
+            guard parts.count == 3,
+                  let month = Int(parts[1]),
+                  let day = Int(parts[2]),
+                  month >= 1,
+                  month <= 12 else {
+                return nil
+            }
+
+            return (month, day)
+        }
+
+        guard !parsed.isEmpty else {
+            return dateStrings.joined(separator: ", ")
+        }
+
+        let allSameMonth = parsed.allSatisfy {
+            $0.month == parsed[0].month
+        }
+
+        if allSameMonth {
+            let monthName = Calendar.current.shortMonthSymbols[parsed[0].month - 1]
+            let days = parsed.map { String($0.day) }.joined(separator: ", ")
+            return "\(monthName) \(days)"
+        }
+
+        return dateStrings
+            .map { formatDate($0) }
+            .joined(separator: ", ")
+    }
+    
     private func formatDate(_ dateString: String) -> String {
         let parts = dateString.split(separator: "-")
 
